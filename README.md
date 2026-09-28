@@ -45,6 +45,23 @@ cd /home/dhiraj/Desktop/Nepal-Tourism-Guide/backend
 mvn spring-boot:run
 ```
 
+## Capacitor mobile app
+
+The existing Vite build is packaged with Capacitor for Android and iOS. Set `VITE_API_BASE_URL` before building so a device can reach the Spring Boot server; do not use `localhost` for a physical device because it refers to the device itself.
+
+```bash
+# Web development
+export VITE_API_BASE_URL=http://localhost:8080
+
+# Android/iOS development on the same LAN (replace with this computer's LAN IP)
+export VITE_API_BASE_URL=http://192.168.1.10:8080
+npm run build
+npx cap sync android
+npx cap sync ios
+```
+
+Open Android with `npx cap open android`. The Android build requires Android Studio and an Android SDK. The iOS project is prepared by `npx cap sync ios`, but final compilation and signing require macOS and Xcode.
+
 ## Notes
 
 - The frontend was verified with `npm run build`.

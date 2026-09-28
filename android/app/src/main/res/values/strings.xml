@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nepal Tourism Guide</string>
+    <string name="title_activity_main">Nepal Tourism Guide</string>
+    <string name="package_name">com.nepaltourism.guide</string>
+    <string name="custom_url_scheme">com.nepaltourism.guide</string>
+</resources>

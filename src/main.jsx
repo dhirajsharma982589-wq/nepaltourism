@@ -1,6 +1,7 @@
 import React, { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import { buildApiUrl, fetchApi } from './apiConfig';
 
 const destinations = [
   {
@@ -414,8 +415,44 @@ const destinationFilters = {
   seasons: ['All seasons', 'Spring', 'Summer', 'Autumn', 'Winter'],
 };
 
-const destinationCatalog = [...destinations, ...additionalDestinations, ...kathmanduValleyPlaces];
-const destinationById = Object.fromEntries(destinationCatalog.map((destination) => [destination.id, destination]));
+let destinationCatalog = [...destinations, ...additionalDestinations, ...kathmanduValleyPlaces];
+let destinationById = Object.fromEntries(destinationCatalog.map((destination) => [destination.id, destination]));
+
+function normalizeBackendDestination(destination) {
+  const metadata = destinationCatalog.find((item) => item.name.toLowerCase() === destination.name.toLowerCase() || item.id === destination.slug);
+  const image = destination.images?.[0] || metadata?.image || fallbackDestinationImage;
+  const region = destination.region?.toLowerCase() || metadata?.region || 'hill';
+  return {
+    ...metadata,
+    ...destination,
+    id: destination.id,
+    image,
+    gallery: destination.images?.length ? destination.images : metadata?.gallery,
+    description: destination.description || destination.shortDescription || metadata?.description || '',
+    category: destination.category || metadata?.category || 'Travel',
+    filterCategory: metadata?.filterCategory || destination.category || 'Travel',
+    region,
+    province: metadata?.province || destination.region,
+    difficulty: metadata?.difficulty || 'Moderate',
+    budget: metadata?.budget || 'Mid-range',
+    popularity: metadata?.popularity || 'Recommended',
+    season: destination.bestSeason || metadata?.season || 'Autumn',
+    famousFor: metadata?.famousFor || [destination.name, destination.category, destination.location].filter(Boolean),
+    activities: metadata?.activities || ['Sightseeing', 'Photography', 'Local experiences'],
+  };
+}
+
+function applyBackendDestinations(data) {
+  const legacyDestinationById = destinationById;
+  destinationCatalog = data.map(normalizeBackendDestination);
+  const backendDestinationById = Object.fromEntries(destinationCatalog.flatMap((destination) => {
+    const metadata = destinations.find((item) => item.name.toLowerCase() === destination.name.toLowerCase())
+      || additionalDestinations.find((item) => item.name.toLowerCase() === destination.name.toLowerCase())
+      || kathmanduValleyPlaces.find((item) => item.name.toLowerCase() === destination.name.toLowerCase());
+    return [[destination.id, destination], ...(metadata ? [[metadata.id, destination]] : [])];
+  }));
+  destinationById = { ...legacyDestinationById, ...backendDestinationById };
+}
 
 const regions = [
   ['Kathmandu Valley', 'Ancient cities, sacred courtyards and living Newari heritage.', 'Bagmati', 'kathmandu'],
@@ -433,20 +470,36 @@ const regions = [
   ['Dolpo', 'Remote valleys, ancient monasteries and an extraordinary silence.', 'Karnali', 'dolpo'],
 ];
 
+const experienceImageByName = {
+  Trekking: 'https://commons.wikimedia.org/wiki/Special:FilePath/Nepal%20Yak%20-%20Himalaya%20trekking.jpg',
+  'Mountaineering': 'https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Everest%20-%20Kukuczka%20Czok.jpg',
+  'Paragliding': 'https://commons.wikimedia.org/wiki/Special:FilePath/%27Tandem%20Paragliding%27%20over%20Pokhara.%28Tuesday%2022-11-2011%29.JPG',
+  'Rafting': 'https://commons.wikimedia.org/wiki/Special:FilePath/Demonstration%20Before%20Raft-Rafting%20in%20Trishuli%20River%2C%20Nepal-3060.jpg',
+  'Bungee Jumping': 'https://commons.wikimedia.org/wiki/Special:FilePath/Amritpaudelphoto3.png',
+  'Jungle Safari': 'https://commons.wikimedia.org/wiki/Special:FilePath/Indian%20rhinoceros%20%28Rhinoceros%20unicornis%29%201.jpg',
+  'Mountain Flight': 'https://commons.wikimedia.org/wiki/Special:FilePath/8%2C848m%20Everest%208%2C516m%20Lhotse%20Himalaya%20Mountain%20Flights%20Nepal%20-%20panoramio.jpg',
+  'Camping': 'https://upload.wikimedia.org/wikipedia/commons/c/c1/The_Heavenly_Rara_Lake_-_edited_2.jpg',
+  'Rock Climbing': 'https://commons.wikimedia.org/wiki/Special:FilePath/Rock%20Climbing%20In%20Nepal%20%28128592639%29.jpeg',
+  'Zipline': 'https://images.unsplash.com/photo-1529516548873-9ce57c8f155e?auto=format&fit=crop&w=1200&q=80',
+  'Cycling': 'https://commons.wikimedia.org/wiki/Special:FilePath/Welcoming%20Participants%20of%20Nepal%20Cycle%20Festival%20in%20Bhaktpur.jpg',
+  'Cultural Tours': 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Bhaktapur_Durbar_Square_2018_13.jpg',
+  'Spiritual Experiences': 'https://commons.wikimedia.org/wiki/Special:FilePath/Swayambhunath%20Stupa%20-Kathmandu%20Nepal-0336.jpg',
+};
+
 const fallbackExperiences = [
-  { id: 0, name: 'Trekking', description: 'Follow ancient footpaths through rhododendron forests, villages and high mountain passes.', location: 'Annapurna & Everest', difficulty: 'Moderate', duration: '5–18 days', cost: 'NPR 45,000+', season: 'Spring / Autumn', safety: 'Use a registered guide, pack layers and acclimatize gradually.', image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 1, name: 'Mountaineering', description: 'Test your limits on Nepal’s legendary summits with an experienced expedition team.', location: 'Khumbu & Manaslu', difficulty: 'Expert', duration: '18–60 days', cost: 'NPR 250,000+', season: 'Spring / Autumn', safety: 'Expedition permits, technical training and a certified climbing team are essential.', image: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 2, name: 'Paragliding', description: 'Float above Phewa Lake with a close-up view of the Annapurna skyline.', location: 'Sarangkot, Pokhara', difficulty: 'Easy', duration: '2–3 hours', cost: 'NPR 8,000–12,000', season: 'October – May', safety: 'Fly with a licensed pilot and confirm wind conditions before takeoff.', image: 'https://images.unsplash.com/photo-1521336575822-6da63fb45455?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 3, name: 'Rafting', description: 'Ride lively Himalayan rivers through forested gorges and wide-open valleys.', location: 'Trishuli & Seti rivers', difficulty: 'Moderate', duration: '1–3 days', cost: 'NPR 6,000–18,000', season: 'October – May', safety: 'Wear a fitted life jacket and helmet and follow your river guide’s commands.', image: 'https://images.unsplash.com/photo-1530866495561-507c44e3e2c8?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 4, name: 'Bungee Jumping', description: 'Take the leap above a dramatic Himalayan gorge for an unforgettable rush.', location: 'The Last Resort, Sindhupalchok', difficulty: 'Moderate', duration: 'Half day', cost: 'NPR 9,000–12,000', season: 'All year', safety: 'Use the certified operator, follow weight limits and secure all loose items.', image: 'https://images.unsplash.com/photo-1521651201144-634f700b36ef?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 5, name: 'Jungle Safari', description: 'Search for rhinos, crocodiles and colorful birds among the Terai grasslands.', location: 'Chitwan National Park', difficulty: 'Easy', duration: '1–3 days', cost: 'NPR 8,000–20,000', season: 'October – March', safety: 'Stay with your naturalist and never approach or feed wildlife.', image: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 6, name: 'Mountain Flight', description: 'See Everest and the Himalayan range from the comfort of a scenic morning flight.', location: 'Kathmandu Airport', difficulty: 'Easy', duration: '1 hour', cost: 'NPR 25,000–35,000', season: 'October – May', safety: 'Keep your passport ready and allow flexibility for weather-related delays.', image: 'https://images.unsplash.com/photo-1464278533981-50106e6176b1?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 7, name: 'Camping', description: 'Sleep beneath clear skies beside lakes, forests and quiet mountain trails.', location: 'Rara & Shivapuri', difficulty: 'Moderate', duration: '2–5 days', cost: 'NPR 12,000–30,000', season: 'Spring / Autumn', safety: 'Camp only in permitted areas and carry warm layers, water and a first-aid kit.', image: 'https://images.unsplash.com/photo-1504851149312-7a075b496cc7?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 8, name: 'Rock Climbing', description: 'Learn movement, balance and focus on natural rock faces around the valley.', location: 'Nagarjun, Kathmandu', difficulty: 'Moderate', duration: 'Half day', cost: 'NPR 3,000–8,000', season: 'October – May', safety: 'Check harnesses and ropes with your instructor before every climb.', image: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 9, name: 'Zipline', description: 'Race above rivers and forested hills on one of Nepal’s fastest adventures.', location: 'Pokhara', difficulty: 'Easy', duration: '2–3 hours', cost: 'NPR 7,000–10,000', season: 'All year', safety: 'Listen to the launch team and use all supplied protective equipment.', image: 'https://images.unsplash.com/photo-1529516548873-9ce57c8f155e?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 10, name: 'Cycling', description: 'Discover back roads, lakeside paths and villages at a slower, more personal pace.', location: 'Pokhara & Kathmandu Valley', difficulty: 'Moderate', duration: 'Half day – 3 days', cost: 'NPR 2,000–8,000', season: 'Spring / Autumn', safety: 'Wear a helmet, carry water and check the bike before leaving.', image: 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 11, name: 'Cultural Tours', description: 'Meet artisans, explore old cities and learn the stories behind Nepal’s traditions.', location: 'Kathmandu & Bhaktapur', difficulty: 'Easy', duration: 'Half day – 2 days', cost: 'NPR 2,000–10,000', season: 'All year', safety: 'Dress respectfully and ask permission before photographing people or ceremonies.', image: 'https://images.unsplash.com/photo-1605640840605-14ac1855827b?auto=format&fit=crop&w=1000&q=85', locations: [] },
-  { id: 12, name: 'Spiritual Experiences', description: 'Make space for stillness through meditation, monasteries and sacred places.', location: 'Lumbini & Kathmandu', difficulty: 'Easy', duration: '1–3 days', cost: 'NPR 3,000–15,000', season: 'All year', safety: 'Observe quiet zones, temple etiquette and local guidance at sacred sites.', image: 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1000&q=85', locations: [] },
+  { id: 0, name: 'Trekking', description: 'Follow ancient footpaths through rhododendron forests, villages and high mountain passes.', location: 'Annapurna & Everest', difficulty: 'Moderate', duration: '5–18 days', cost: 'NPR 45,000+', season: 'Spring / Autumn', safety: 'Use a registered guide, pack layers and acclimatize gradually.', image: experienceImageByName['Trekking'], locations: [] },
+  { id: 1, name: 'Mountaineering', description: 'Test your limits on Nepal’s legendary summits with an experienced expedition team.', location: 'Khumbu & Manaslu', difficulty: 'Expert', duration: '18–60 days', cost: 'NPR 250,000+', season: 'Spring / Autumn', safety: 'Expedition permits, technical training and a certified climbing team are essential.', image: experienceImageByName['Mountaineering'], locations: [] },
+  { id: 2, name: 'Paragliding', description: 'Float above Phewa Lake with a close-up view of the Annapurna skyline.', location: 'Sarangkot, Pokhara', difficulty: 'Easy', duration: '2–3 hours', cost: 'NPR 8,000–12,000', season: 'October – May', safety: 'Fly with a licensed pilot and confirm wind conditions before takeoff.', image: experienceImageByName['Paragliding'], locations: [] },
+  { id: 3, name: 'Rafting', description: 'Ride lively Himalayan rivers through forested gorges and wide-open valleys.', location: 'Trishuli & Seti rivers', difficulty: 'Moderate', duration: '1–3 days', cost: 'NPR 6,000–18,000', season: 'October – May', safety: 'Wear a fitted life jacket and helmet and follow your river guide’s commands.', image: experienceImageByName['Rafting'], locations: [] },
+  { id: 4, name: 'Bungee Jumping', description: 'Take the leap above a dramatic Himalayan gorge for an unforgettable rush.', location: 'The Last Resort, Sindhupalchok', difficulty: 'Moderate', duration: 'Half day', cost: 'NPR 9,000–12,000', season: 'All year', safety: 'Use the certified operator, follow weight limits and secure all loose items.', image: experienceImageByName['Bungee Jumping'], locations: [] },
+  { id: 5, name: 'Jungle Safari', description: 'Search for rhinos, crocodiles and colorful birds among the Terai grasslands.', location: 'Chitwan National Park', difficulty: 'Easy', duration: '1–3 days', cost: 'NPR 8,000–20,000', season: 'October – March', safety: 'Stay with your naturalist and never approach or feed wildlife.', image: experienceImageByName['Jungle Safari'], locations: [] },
+  { id: 6, name: 'Mountain Flight', description: 'See Everest and the Himalayan range from the comfort of a scenic morning flight.', location: 'Kathmandu Airport', difficulty: 'Easy', duration: '1 hour', cost: 'NPR 25,000–35,000', season: 'October – May', safety: 'Keep your passport ready and allow flexibility for weather-related delays.', image: experienceImageByName['Mountain Flight'], locations: [] },
+  { id: 7, name: 'Camping', description: 'Sleep beneath clear skies beside lakes, forests and quiet mountain trails.', location: 'Rara & Shivapuri', difficulty: 'Moderate', duration: '2–5 days', cost: 'NPR 12,000–30,000', season: 'Spring / Autumn', safety: 'Camp only in permitted areas and carry warm layers, water and a first-aid kit.', image: experienceImageByName['Camping'], locations: [] },
+  { id: 8, name: 'Rock Climbing', description: 'Learn movement, balance and focus on natural rock faces around the valley.', location: 'Nagarjun, Kathmandu', difficulty: 'Moderate', duration: 'Half day', cost: 'NPR 3,000–8,000', season: 'October – May', safety: 'Check harnesses and ropes with your instructor before every climb.', image: experienceImageByName['Rock Climbing'], locations: [] },
+  { id: 9, name: 'Zipline', description: 'Race above rivers and forested hills on one of Nepal’s fastest adventures.', location: 'Pokhara', difficulty: 'Easy', duration: '2–3 hours', cost: 'NPR 7,000–10,000', season: 'All year', safety: 'Listen to the launch team and use all supplied protective equipment.', image: experienceImageByName['Zipline'], locations: [] },
+  { id: 10, name: 'Cycling', description: 'Discover back roads, lakeside paths and villages at a slower, more personal pace.', location: 'Pokhara & Kathmandu Valley', difficulty: 'Moderate', duration: 'Half day – 3 days', cost: 'NPR 2,000–8,000', season: 'Spring / Autumn', safety: 'Wear a helmet, carry water and check the bike before leaving.', image: experienceImageByName['Cycling'], locations: [] },
+  { id: 11, name: 'Cultural Tours', description: 'Meet artisans, explore old cities and learn the stories behind Nepal’s traditions.', location: 'Kathmandu & Bhaktapur', difficulty: 'Easy', duration: 'Half day – 2 days', cost: 'NPR 2,000–10,000', season: 'All year', safety: 'Dress respectfully and ask permission before photographing people or ceremonies.', image: experienceImageByName['Cultural Tours'], locations: [] },
+  { id: 12, name: 'Spiritual Experiences', description: 'Make space for stillness through meditation, monasteries and sacred places.', location: 'Lumbini & Kathmandu', difficulty: 'Easy', duration: '1–3 days', cost: 'NPR 3,000–15,000', season: 'All year', safety: 'Observe quiet zones, temple etiquette and local guidance at sacred sites.', image: experienceImageByName['Spiritual Experiences'], locations: [] },
 ];
 
 const categories = [
@@ -456,7 +509,7 @@ const categories = [
   ['◌', 'Lakes & nature', '27 destinations', 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=700&q=80'],
 ];
 
-const travelGuideSections = [
+let travelGuideSections = [
   ['Visa information', 'Visa rules and fees can change. Check the official Nepal immigration or embassy website for your nationality before booking.', 'Verify before travel'],
   ['Currency', 'Nepalese Rupee (NPR) is the local currency. Keep small notes for local transport and rural areas; card acceptance varies.', 'Verify current rates'],
   ['Language & time zone', 'Nepali is the national language. English is common in tourist areas. Nepal Time is UTC+5:45.', 'General guidance'],
@@ -498,14 +551,14 @@ const festivals = [
   ['Teej', 'Women gather for devotional singing, dance and fasting in honor of tradition and family.', 'Usually Aug–Sep; lunar dates vary.'],
 ];
 
-const festivalCards = [
+let festivalCards = [
   ['Chhath', 'A respectful, community-centered festival of gratitude to the Sun. Devotees prepare offerings, fast according to tradition and gather at rivers, ponds and other water bodies for evening and morning prayers. In Nepal, Janakpur, Birgunj, Biratnagar, Rajbiraj and other Terai/Madhesh towns are well-known places to experience its public rituals.', 'Terai / Madhesh cultural prominence', 'Offerings include fruits, sugarcane, thekua and other carefully prepared foods; baskets are carried to decorated ghats and placed near the water during arghya rituals.', 'https://upload.wikimedia.org/wikipedia/commons/0/0f/JanakpurChhathParvaFestival.jpg'],
   ['Dashain', 'Nepal’s major national festival is a time for family reunions, blessings and renewal. Households visit elders for tika and jamara, share festive food and observe rituals according to their family and community traditions.', 'Celebrated widely across Nepal', 'Family gatherings, temple visits, flying kites in some communities, tika, jamara and meals such as meat, sel roti and seasonal dishes.', 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Soaring_High_in_Dashain.jpg'],
   ['Tihar / Diwali', 'The festival of lights honors relationships, animals and prosperity across five days of local observances. Homes and streets glow with lamps, rangoli and marigold garlands.', 'Celebrated widely across Nepal', 'Laxmi Puja, Deusi-Bhailo songs, offerings to crows, dogs and cows, and Bhai Tika shared between siblings.', 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Sister_lighting_traditional_lamp_during_Tihar_festival_%28edited%29.jpg'],
   ['Holi', 'The festival of colors brings neighbors and visitors together in lively community celebrations. Customs differ by place, but the shared themes are spring, goodwill and renewal.', 'Celebrated across Nepal with regional traditions', 'Colored powders and water, music, family visits and public gatherings; ask before applying color and protect cultural or religious spaces.', 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Holi_Colors.jpg'],
 ];
 
-const foods = [
+let foods = [
   ['Dal Bhat', 'Rice, lentils, vegetables and pickles: a nourishing everyday meal across Nepal.', 'Nationwide', 'Vegetarian-friendly', 'A symbol of everyday hospitality and regional variety.', 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80'],
   ['Momo', 'Steamed or fried dumplings filled with vegetables, chicken or other seasoned fillings.', 'Nationwide', 'Vegetarian or non-vegetarian', 'A beloved shared snack influenced by Himalayan and Tibetan foodways.', 'https://images.unsplash.com/photo-1626776876729-bab4369c5a5a?auto=format&fit=crop&w=800&q=80'],
   ['Thukpa', 'A warming noodle soup with vegetables, herbs and optional meat.', 'Himalayan regions', 'Vegetarian or non-vegetarian', 'A comforting highland dish suited to cool mountain evenings.', 'https://images.unsplash.com/photo-1552611052-33e04de081de?auto=format&fit=crop&w=800&q=80'],
@@ -516,8 +569,85 @@ const foods = [
   ['Chowmein', 'Stir-fried noodles with vegetables, egg or meat and a Nepali street-food style.', 'Nationwide', 'Vegetarian or non-vegetarian', 'A popular everyday adaptation enjoyed in homes, cafés and roadside stalls.', 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80'],
 ];
 
+function applyBackendInformation({ guide, festivals: festivalRecords, food: foodRecords }) {
+  travelGuideSections = guide.map((item) => [item.title, item.content, item.verificationNote || 'General guidance']);
+  festivalCards = festivalRecords.map((item) => [
+    item.name,
+    item.description,
+    item.region?.name || item.season || 'Nepal',
+    item.culturalSignificance || item.season || 'Dates vary yearly; verify the local calendar.',
+    item.imageUrl || '',
+  ]);
+  foods = foodRecords.map((item) => [
+    item.name,
+    item.description,
+    item.region?.name || 'Nepal',
+    item.vegetarian ? 'Vegetarian' : 'Vegetarian or non-vegetarian',
+    item.description,
+    item.imageUrl || '',
+  ]);
+}
+
 function ArrowIcon() {
   return <span aria-hidden="true" className="arrow-icon">↗</span>;
+}
+
+function AuthPanel({ onClose, onAuthenticated }) {
+  const [mode, setMode] = useState('login');
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', country: '', preferredTravelStyle: '' });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      if (mode === 'register') {
+        await fetchApi('/api/auth/register', { method: 'POST', body: JSON.stringify(form) });
+        setMode('login');
+        setMessage('Registration successful. You can now log in.');
+        setForm((current) => ({ ...current, password: '' }));
+      } else {
+        const result = await fetchApi('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: form.email, password: form.password }) });
+        localStorage.setItem('nepal-tourism-token', result.token);
+        const profile = await fetchApi('/api/profile');
+        localStorage.setItem('nepal-tourism-user', JSON.stringify(profile));
+        onAuthenticated(profile);
+        onClose();
+      }
+    } catch (requestError) {
+      if (requestError.status === 401) setError('Invalid email or password.');
+      else if (requestError.status === 400) setError(requestError.message || 'Please check the form fields.');
+      else if (requestError.status === 403) setError('You do not have permission to complete this request.');
+      else setError('The authentication service is unavailable. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="auth-panel" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button className="auth-close" onClick={onClose} aria-label="Close authentication panel">×</button>
+        <p className="eyebrow">Welcome to Nepal</p>
+        <h2 id="auth-title">{mode === 'login' ? 'Log in.' : 'Join the journey.'}</h2>
+        <div className="auth-tabs"><button className={mode === 'login' ? 'selected' : ''} onClick={() => { setMode('login'); setError(''); setMessage(''); }}>Log in</button><button className={mode === 'register' ? 'selected' : ''} onClick={() => { setMode('register'); setError(''); setMessage(''); }}>Register</button></div>
+        <form onSubmit={submit} className="auth-form">
+          {mode === 'register' && <label>Full name<input required value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} autoComplete="name" /></label>}
+          <label>Email<input required type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} autoComplete="email" /></label>
+          <label>Password<input required minLength={8} type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
+          {mode === 'register' && <><label>Country<input value={form.country} onChange={(event) => updateField('country', event.target.value)} autoComplete="country-name" /></label><label>Travel style<select value={form.preferredTravelStyle} onChange={(event) => updateField('preferredTravelStyle', event.target.value)}><option value="">Choose a style</option><option>Adventure</option><option>Cultural</option><option>Nature</option><option>Family</option></select></label></>}
+          {message && <p className="auth-message" role="status">{message}</p>}
+          {error && <p className="auth-error" role="alert">{error}</p>}
+          <button className="button button-primary auth-submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'} <ArrowIcon /></button>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 const fallbackDestinationImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700"%3E%3Crect width="1000" height="700" fill="%23dfe8e4"/%3E%3Cpath d="M0 600 280 310 450 470 610 250 1000 600V700H0Z" fill="%2398b8ad"/%3E%3Cpath d="m80 610 210-180 115 110 190-220 260 290Z" fill="%233e806d"/%3E%3C/svg%3E';
@@ -540,13 +670,18 @@ function SectionTitle({ eyebrow, title, action }) {
 }
 
 function DestinationCard({ destination, favorite, onFavorite }) {
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const handleFavorite = async () => {
+    setFavoriteBusy(true);
+    try { await onFavorite(destination.id); } finally { setFavoriteBusy(false); }
+  };
   return (
     <article className="destination-card dashboard-card">
       <div className="card-image-wrap">
         <DestinationImage destination={destination} />
         <span className="category-pill">{destination.category}</span>
-        <button className={`favorite-button ${favorite ? 'is-favorite' : ''}`} onClick={() => onFavorite(destination.id)} aria-label={`${favorite ? 'Remove' : 'Save'} ${destination.name} favorite`}>
-          {favorite ? '♥' : '♡'}
+        <button className={`favorite-button ${favorite ? 'is-favorite' : ''}`} onClick={handleFavorite} disabled={favoriteBusy} aria-label={`${favorite ? 'Remove' : 'Save'} ${destination.name} favorite`}>
+          {favoriteBusy ? '…' : favorite ? '♥' : '♡'}
         </button>
       </div>
       <div className="destination-card-body">
@@ -578,10 +713,16 @@ function ValleyAreaCard({ area, destination, count, onExplore }) {
   );
 }
 
-function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddToTrip }) {
+function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddToTrip, isAuthenticated = Boolean(localStorage.getItem('nepal-tourism-token')), authenticatedUser = (() => { try { return JSON.parse(localStorage.getItem('nepal-tourism-user') || 'null'); } catch { return null; } })(), onAuthRequired = () => window.dispatchEvent(new Event('nepal-tourism-auth-required')) }) {
   const [activeImage, setActiveImage] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [reviewWasEdited, setReviewWasEdited] = useState(false);
   const gallery = destination.gallery || [destination.image];
   const isPokhara = destination.name === 'Pokhara';
   const destinationGuide = destinationDetailData[destination.id];
@@ -593,6 +734,61 @@ function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddTo
     reach: destinationGuide?.reach || (isPokhara ? 'A 25-minute flight or a scenic 6–8 hour drive from Kathmandu.' : 'Connect through Kathmandu by domestic flight, tourist bus or private transfer.'),
     nearby: destinationGuide?.nearby || (isPokhara ? ['Sarangkot', 'World Peace Pagoda', 'Begnas Lake', 'Davis Falls'] : ['Local viewpoint', 'Nearby heritage landmark', 'Community market', 'Regional nature trail']),
     food: destinationGuide?.food || (isPokhara ? ['Thakali set', 'Momo with local achar', 'Fresh lake-side coffee'] : ['Dal bhat and seasonal tarkari', 'Newari or regional khaja set', 'Local tea and handmade sweets']),
+  };
+
+  useEffect(() => {
+    let active = true;
+    fetchApi(`/api/destinations/${destination.id}/reviews`).then((data) => {
+      if (active) setReviews(data);
+    }).catch(() => {
+      if (active) setReviews([]);
+    });
+    return () => { active = false; };
+  }, [destination.id]);
+
+  const submitReview = async (event) => {
+    event.preventDefault();
+    if (!isAuthenticated) { onAuthRequired(); return; }
+    setReviewLoading(true);
+    setReviewError('');
+    try {
+      const review = await fetchApi(editingReviewId ? `/api/reviews/${editingReviewId}` : `/api/destinations/${destination.id}/reviews`, { method: editingReviewId ? 'PUT' : 'POST', body: JSON.stringify({ rating: reviewRating, comment: reviewText }) });
+      setReviews((current) => editingReviewId ? current.map((item) => item.id === editingReviewId ? review : item) : [...current, review]);
+      setReviewSubmitted(true);
+      setReviewWasEdited(Boolean(editingReviewId));
+      setReviewText('');
+      setEditingReviewId(null);
+    } catch (error) {
+      setReviewError(error.message || 'Your review could not be submitted.');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const editReview = (review) => {
+    setEditingReviewId(review.id);
+    setReviewRating(review.rating);
+    setReviewText(review.comment);
+    setReviewSubmitted(false);
+    setReviewError('');
+  };
+
+  const deleteReview = async (reviewId) => {
+    if (!window.confirm('Delete this review?')) return;
+    setReviewLoading(true);
+    setReviewError('');
+    try {
+      await fetchApi(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+      setReviews((current) => current.filter((review) => review.id !== reviewId));
+      if (editingReviewId === reviewId) {
+        setEditingReviewId(null);
+        setReviewText('');
+      }
+    } catch (error) {
+      setReviewError(error.message || 'Your review could not be deleted.');
+    } finally {
+      setReviewLoading(false);
+    }
   };
 
   const shareDestination = async () => {
@@ -633,7 +829,7 @@ function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddTo
           <section className="detail-block"><h3>Nearby attractions</h3><div className="nearby-list">{details.nearby.map((item) => <span key={item}>⌖ {item}</span>)}</div></section>
           <section className="detail-block info-columns"><div><h3>Where to stay</h3><p>Choose from welcoming guesthouses, boutique stays and comfortable hotels near the main town.</p></div><div><h3>What to eat</h3><ul className="simple-list">{details.food.map((item) => <li key={item}>{item}</li>)}</ul></div></section>
           <section className="detail-block safety-block"><h3>{destinationGuide ? 'Responsible tourism' : 'Safety tips'}</h3><p>{destinationGuide?.responsible || 'Keep valuables secure, respect local customs, carry water and check local weather before heading outdoors. For treks, use a registered guide and allow time to acclimatize.'}</p></section>
-          <section className="detail-block review-section"><div className="review-heading"><div><p className="eyebrow">Traveler voices</p><h2>User <em>reviews.</em></h2></div><strong>★ {destination.rating}<small> / 5.0 average</small></strong></div><article className="review-card"><div className="review-avatar">AS</div><div><strong>Anisha Shrestha</strong><span>Visited recently · ★★★★★</span><p>“A beautiful place with kind people and so many small moments worth remembering.”</p></div></article><form className="review-form" onSubmit={(event) => { event.preventDefault(); setReviewSubmitted(true); setReviewText(''); }}><label>Share your experience<textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Tell future travelers what you loved..." required /></label><button className="button button-dark" type="submit">Post review</button>{reviewSubmitted && <span className="review-success">Thanks — your review was added for this session.</span>}</form></section>
+          <section className="detail-block review-section"><div className="review-heading"><div><p className="eyebrow">Traveler voices</p><h2>User <em>reviews.</em></h2></div><strong>★ {destination.rating}<small> / 5.0 average</small></strong></div>{reviews.length ? reviews.map((review) => { const isOwnReview = isAuthenticated && authenticatedUser?.name === review.userEmail; return <article className="review-card" key={review.id}><div className="review-avatar">{review.user?.slice(0, 2).toUpperCase() || 'TR'}</div><div><strong>{review.user}</strong><span>★ {review.rating}</span><p>{review.comment}</p>{isOwnReview && <div className="review-actions"><button type="button" onClick={() => editReview(review)}>Edit</button><button type="button" onClick={() => deleteReview(review.id)} disabled={reviewLoading}>Delete</button></div>}</div></article>; }) : <p className="review-empty">No reviews yet. Be the first to share your experience.</p>}<form className="review-form" onSubmit={submitReview}><label>Rating<select value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><label>{editingReviewId ? 'Edit your experience' : 'Share your experience'}<textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Tell future travelers what you loved..." required /></label><button className="button button-dark" type="submit" disabled={reviewLoading}>{reviewLoading ? 'Saving…' : editingReviewId ? 'Save changes' : isAuthenticated ? 'Post review' : 'Log in to review'}</button>{editingReviewId && <button type="button" className="button button-outline" onClick={() => { setEditingReviewId(null); setReviewText(''); }}>Cancel edit</button>}{reviewSubmitted && <span className="review-success">{reviewWasEdited ? 'Your review was updated.' : 'Your review was added.'}</span>}{reviewError && <span className="auth-error" role="alert">{reviewError}</span>}</form></section>
         </div>
         <aside className="detail-sidebar"><div className="weather-card"><p className="eyebrow light">Live travel snapshot</p><span className="weather-icon">☼</span><strong>18°</strong><span>Partly cloudy</span><small>Good conditions for exploring</small></div><div className="map-card"><div className="map-art"><span>⌖</span><i /><i /><i /></div><div><p className="eyebrow">Find your way</p><h3>{destination.name} map</h3><p>View this destination and nearby places on a map.</p><a href={`https://www.google.com/maps/search/${encodeURIComponent(destination.name + ' Nepal')}`} target="_blank" rel="noreferrer">Open in Maps <ArrowIcon /></a></div></div></aside>
       </section>
@@ -747,23 +943,32 @@ function ExperienceCard({ experience, index }) {
   );
 }
 
-function ExperiencesPage({ onBack }) {
-  const [experiences, setExperiences] = useState(fallbackExperiences);
+function ExperiencesPage({ onBack, experiences: initialExperiences = [] }) {
+  const [experiences, setExperiences] = useState(initialExperiences);
   const [loadingExperiences, setLoadingExperiences] = useState(true);
+  const [experienceError, setExperienceError] = useState('');
   const [activeCategory, setActiveCategory] = useState('All experiences');
 
   useEffect(() => {
     const controller = new AbortController();
 
+    const resolveExperienceImage = (experience) => {
+      const title = experience?.name;
+      const mappedImage = title ? experienceImageByName[title] : null;
+      return mappedImage || experience?.image || experience?.imageUrl || fallbackExperiences.find((item) => item.name === title)?.image || fallbackExperiences[0].image;
+    };
+
     const loadExperiences = async () => {
       try {
         setLoadingExperiences(true);
-        const response = await fetch('http://localhost:8080/api/experiences', { signal: controller.signal });
-        if (!response.ok) throw new Error(`Failed to fetch experiences: ${response.status}`);
-        const data = await response.json();
-        setExperiences(data.length ? data.map((experience) => ({ ...experience, image: experience.image || experience.imageUrl || fallbackExperiences[0].image, locations: experience.locations || [] })) : fallbackExperiences);
-      } catch {
-        setExperiences(fallbackExperiences);
+        const data = await fetchApi('/api/experiences', { signal: controller.signal });
+        setExperiences(data.map((experience) => ({ ...experience, image: resolveExperienceImage(experience), locations: experience.locations || [] })));
+        setExperienceError('');
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setExperiences([]);
+          setExperienceError('Experiences could not be loaded. Please try again shortly.');
+        }
       } finally {
         setLoadingExperiences(false);
       }
@@ -788,6 +993,7 @@ function ExperiencesPage({ onBack }) {
       </section>
       <section className="page-container experiences-content">
         <div className="explore-heading"><div><p className="eyebrow">Make it memorable</p><h2>Adventure &<br /><em>experiences.</em></h2></div><span>{loadingExperiences ? 'Loading...' : `${experiences.length} ways to explore`}</span></div>
+        {experienceError && <div className="empty-state" role="alert">{experienceError}</div>}
         <div className="experience-category-tabs">{categories.map((category) => <button key={category} className={activeCategory === category ? 'selected' : ''} onClick={() => setActiveCategory(category)}>{category}</button>)}</div>
         <div className="experience-detail-grid">{visibleExperiences.map((experience, index) => <ExperienceCard experience={experience} index={index} key={experience.id || experience.name} />)}</div>
       </section>
@@ -795,7 +1001,7 @@ function ExperiencesPage({ onBack }) {
   );
 }
 
-function TripPlanner({ onBack, initialPlaces = [] }) {
+function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(localStorage.getItem('nepal-tourism-token')), onAuthRequired = () => window.dispatchEvent(new Event('nepal-tourism-auth-required')), destinationLookup = (name) => destinationCatalog.find((destination) => destination.name.toLowerCase() === name.toLowerCase()) }) {
   const travelStyles = ['Budget', 'Standard', 'Luxury', 'Adventure', 'Family', 'Cultural', 'Nature'];
   const interests = ['Mountains', 'Trekking', 'Culture', 'Food', 'Wildlife', 'Photography', 'Adventure', 'Spirituality', 'History'];
   const plannerDestinations = ['Kathmandu Valley', 'Pokhara', 'Chitwan National Park', 'Everest Base Camp', 'Bandipur', 'Lumbini', 'Rara Lake', 'Mardi Himal'];
@@ -807,6 +1013,186 @@ function TripPlanner({ onBack, initialPlaces = [] }) {
   const [itinerary, setItinerary] = useState([]);
   const [saved, setSaved] = useState(false);
   const [newPlace, setNewPlace] = useState('Everest Base Camp');
+  const [savedTrips, setSavedTrips] = useState([]);
+  const [selectedTripId, setSelectedTripId] = useState('');
+  const [plannerLoading, setPlannerLoading] = useState(false);
+  const [plannerError, setPlannerError] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    fetchApi('/api/trips').then(setSavedTrips).catch(() => setPlannerError('Saved trips could not be loaded.'));
+    return undefined;
+  }, [isAuthenticated]);
+
+  const parseDateValue = (value) => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const formatDateValue = (date) => new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+
+  const addDays = (date, days) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  };
+
+  const getDayCount = (start, end) => {
+    const startDate = parseDateValue(start);
+    const endDate = parseDateValue(end);
+
+    if (!startDate || !endDate) return 0;
+    if (endDate < startDate) return 0;
+
+    const diffInMs = endDate.getTime() - startDate.getTime();
+    return Math.max(1, Math.floor(diffInMs / (1000 * 60 * 60 * 24)) + 1);
+  };
+
+  const getBudgetProfile = (selectedBudget) => {
+    if (selectedBudget.includes('200,000') || selectedBudget.includes('200000')) return 'luxury';
+    if (selectedBudget.includes('100,000') || selectedBudget.includes('100000')) return 'comfort';
+    if (selectedBudget.includes('25,000') || selectedBudget.includes('25000')) return 'budget';
+    return 'comfort';
+  };
+
+  const getDestinationMealRecommendation = (place, budgetProfile, interestsSet) => {
+    const normalized = place.toLowerCase();
+    const foodPreferences = ['Dal Bhat', 'Momo', 'Thukpa', 'Newari cuisine', 'Sel Roti'];
+
+    if (normalized.includes('kathmandu') || normalized.includes('bhaktapur') || normalized.includes('lalitpur')) {
+      return budgetProfile === 'luxury' ? 'Newari fine dining and rooftop coffee in Kathmandu Valley' : budgetProfile === 'budget' ? 'Momo, dal bhat and local tea houses in the old streets' : 'Newari cuisine and neighborhood cafés around the heritage squares';
+    }
+
+    if (normalized.includes('pokhara')) {
+      if (interestsSet.includes('food')) return budgetProfile === 'luxury' ? 'Lake-view dining and Thakali cuisine in Pokhara' : 'Momo, dal bhat and local lakeside cafés';
+      return budgetProfile === 'budget' ? 'Local eateries near Lakeside and simple thali spots' : 'Comfortable lakeside dining and Thakali meals';
+    }
+
+    if (normalized.includes('chitwan')) {
+      return budgetProfile === 'luxury' ? 'Wildlife lodge dining and riverside restaurant experiences' : 'Local Tharu-inspired meals and simple lodge dining';
+    }
+
+    if (normalized.includes('everest') || normalized.includes('mardi') || normalized.includes('rara')) {
+      return budgetProfile === 'budget' ? 'Simple teahouse meals, soups and warm local staples' : 'Warm mountain meals, teahouse dinners and Sherpa-style cooking';
+    }
+
+    if (normalized.includes('bandipur') || normalized.includes('lumbini')) {
+      return budgetProfile === 'budget' ? 'Local cafés, regional snacks and simple family-run meals' : 'Traditional local dishes and relaxed sit-down dining';
+    }
+
+    return foodPreferences[Math.min(foodPreferences.length - 1, Math.max(0, Math.abs(place.length) % foodPreferences.length))];
+  };
+
+  const getDestinationActivityPlan = (place, dayIndex, totalDays, styleProfile, budgetProfile, interestSet) => {
+    const normalizedPlace = place.toLowerCase();
+    const isRelaxed = styleProfile === 'relaxed' || styleProfile === 'family';
+    const wantsCulture = interestSet.includes('culture') || interestSet.includes('history') || interestSet.includes('spirituality');
+    const wantsNature = interestSet.includes('nature') || interestSet.includes('mountains') || interestSet.includes('photography');
+    const wantsAdventure = interestSet.includes('adventure') || interestSet.includes('trekking') || interestSet.includes('wildlife');
+    const wantsWildlife = interestSet.includes('wildlife');
+    const wantsSpirituality = interestSet.includes('spirituality');
+    const wantsFood = interestSet.includes('food');
+
+    let morning = 'Start with a slow breakfast and a walk around the local neighborhood.';
+    let afternoon = 'Enjoy a well-paced local highlight and some time to take in the setting.';
+    let evening = 'End the day with a relaxed meal or a scenic viewpoint before rest.';
+    let travelNote = 'Local transport and short transfers are planned to keep the day comfortable.';
+
+    if (normalizedPlace.includes('kathmandu')) {
+      morning = wantsCulture ? 'Visit a heritage square, temple complex or old neighborhood with time for local stories.' : 'Begin with a gentle city walk and a landmark that best matches your pace.';
+      afternoon = wantsNature ? 'Spend time at a peaceful viewpoint or quiet cultural garden outside the busiest streets.' : 'Explore a key heritage circle, market or monastery area.';
+      evening = wantsFood ? 'Enjoy a local Newari or Nepali dinner with a relaxed evening walk.' : 'Take it easy with a quiet dinner and a short evening stroll.';
+    }
+
+    if (normalizedPlace.includes('pokhara')) {
+      morning = wantsNature ? 'Head to a scenic viewpoint or lakeside path for the best sunrise and mountain atmosphere.' : 'Begin with a calm lakeside route and easy city exploration.';
+      afternoon = wantsAdventure ? 'Choose a short adventure activity or viewpoint outing suited to your energy level.' : 'Enjoy a gentle activity and a slow lunch by the lake.';
+      evening = wantsFood ? 'Sample lakeside dining with a relaxed sunset experience.' : 'Wind down with a scenic evening overlooking the water.';
+    }
+
+    if (normalizedPlace.includes('chitwan')) {
+      morning = wantsNature || wantsWildlife ? 'Do a structured wildlife or nature activity early when the park is most active.' : 'Take a slow start with a local nature walk.';
+      afternoon = 'Continue with a guided experience aligned to your interest profile and keep the pace realistic.';
+      evening = 'Have dinner near your lodge or a local riverside place and rest well for the next day.';
+    }
+
+    if (normalizedPlace.includes('everest') || normalizedPlace.includes('mardi')) {
+      morning = wantsAdventure || wantsNature ? 'Start early with the most scenic or physically engaging part of the route.' : 'Have a gentle start with a scenic walk and a slower pace.';
+      afternoon = isRelaxed ? 'Keep the midday block lighter with a scenic break and rest.' : 'Continue with a meaningful viewpoint or trekking segment matched to your comfort.';
+      evening = 'Enjoy a hearty local meal and early recovery before the next stage.';
+      travelNote = budgetProfile === 'budget' ? 'Shared or local transport is used to keep the route economical.' : 'Private or pre-arranged transport can be used to reduce travel friction.';
+    }
+
+    if (normalizedPlace.includes('bandipur')) {
+      morning = wantsCulture ? 'Explore the historic lanes, windows, local architecture and heritage corners.' : 'Take a relaxed walk through the hill town and settle into the atmosphere.';
+      afternoon = wantsFood ? 'Stop for a café break and sample local flavors in a relaxed setting.' : 'Spend a slow afternoon enjoying the views and town atmosphere.';
+      evening = 'Wrap up with dinner and a calm sunset moment.';
+    }
+
+    if (normalizedPlace.includes('lumbini')) {
+      morning = wantsCulture || wantsSpirituality ? 'Visit the key sacred sites and reflection spaces with time for quiet observation.' : 'Begin with a peaceful historic walk around the area.';
+      afternoon = 'Explore the local heritage and take time for a slower lunch.';
+      evening = 'Keep the evening calm with dinner and a reflective finish to the day.';
+    }
+
+    if (isRelaxed) {
+      morning = morning.includes('Start') ? 'Keep the morning slow with breakfast, a short walk and time to settle in.' : morning;
+      afternoon = 'Leave room for rest, coffee, or a short local browse rather than a packed schedule.';
+      evening = 'Use the evening for unhurried dining and recovery.';
+    }
+
+    if (styleProfile === 'luxury') {
+      morning = `Luxury morning: ${morning}`;
+      afternoon = `Luxury afternoon: ${afternoon}`;
+      evening = `Luxury evening: ${evening}`;
+      travelNote = 'Private transfers and premium service timing are preferred for maximum comfort.';
+    }
+
+    if (styleProfile === 'budget' || budgetProfile === 'budget') {
+      travelNote = 'Use local transport and lower-cost food options where practical.';
+    }
+
+    if (styleProfile === 'adventure') {
+      morning = wantsAdventure ? 'Begin with your most active experience while energy and conditions are best.' : morning;
+      afternoon = wantsAdventure ? 'Continue the active component and keep the rest of the day lighter.' : afternoon;
+    }
+
+    return { morning, afternoon, evening, travelNote };
+  };
+
+  const distributeSelectedPlaces = (places, totalDays) => {
+    if (!places.length) return Array.from({ length: totalDays }, () => 'Kathmandu Valley');
+    if (totalDays <= 0) return [];
+    if (places.length === 1) return Array.from({ length: totalDays }, () => places[0]);
+
+    const flow = [];
+    for (let dayIndex = 0; dayIndex < totalDays; dayIndex += 1) {
+      const placeIndex = dayIndex % places.length;
+      flow.push(places[placeIndex]);
+    }
+
+    if (totalDays > places.length) {
+      const longestStay = Math.max(2, Math.ceil(totalDays / places.length));
+      const withStays = [];
+      for (let placeIndex = 0; placeIndex < places.length; placeIndex += 1) {
+        const remaining = totalDays - withStays.length;
+        const stayLength = placeIndex === places.length - 1 ? remaining : Math.min(longestStay, Math.max(1, Math.ceil((totalDays - placeIndex) / (places.length - placeIndex))));
+        for (let i = 0; i < stayLength; i += 1) {
+          if (withStays.length >= totalDays) break;
+          withStays.push(places[placeIndex]);
+        }
+      }
+      return withStays.slice(0, totalDays);
+    }
+
+    return flow;
+  };
 
   const togglePlace = (place) => {
     setSelectedPlaces((current) => current.includes(place) ? current.filter((item) => item !== place) : [...current, place]);
@@ -815,12 +1201,43 @@ function TripPlanner({ onBack, initialPlaces = [] }) {
     setSelectedInterests((current) => current.includes(interest) ? current.filter((item) => item !== interest) : [...current, interest]);
   };
   const generateItinerary = () => {
+    const startDateValue = parseDateValue(dates.start);
+    const endDateValue = parseDateValue(dates.end);
+    const dateCount = getDayCount(dates.start, dates.end);
+
+    if (!startDateValue || !endDateValue || dateCount === 0) {
+      setItinerary([]);
+      return;
+    }
+
     const places = selectedPlaces.length ? selectedPlaces : ['Kathmandu Valley'];
-    setItinerary(places.map((place, index) => ({
-      day: index + 1,
-      place,
-      activity: index === 0 ? 'Arrive, settle in and discover the local highlights.' : index === 1 ? 'Explore signature sights and enjoy a relaxed local meal.' : 'Follow a memorable experience shaped around your interests.',
-    })));
+    const daySequence = distributeSelectedPlaces(places, dateCount);
+    const budgetProfile = getBudgetProfile(budget);
+    const styleProfile = style.toLowerCase();
+    const interestSet = selectedInterests.length ? selectedInterests.map((item) => item.toLowerCase()) : ['culture'];
+
+    const generatedItinerary = daySequence.map((place, index) => {
+      const currentDate = addDays(startDateValue, index);
+      const recommendations = getDestinationActivityPlan(place, index, daySequence.length, styleProfile, budgetProfile, interestSet);
+      const mealRecommendation = getDestinationMealRecommendation(place, budgetProfile, interestSet);
+
+      return {
+        day: index + 1,
+        date: formatDateValue(currentDate),
+        place,
+        activity: [
+          `Date: ${formatDateValue(currentDate)}`,
+          `Location: ${place}`,
+          `Morning: ${recommendations.morning}`,
+          `Afternoon: ${recommendations.afternoon}`,
+          `Evening: ${recommendations.evening}`,
+          `Eating: ${mealRecommendation}`,
+          `Travel: ${recommendations.travelNote}`,
+        ].join('\n'),
+      };
+    });
+
+    setItinerary(generatedItinerary);
     setSaved(false);
   };
   const addPlace = () => {
@@ -836,6 +1253,70 @@ function TripPlanner({ onBack, initialPlaces = [] }) {
   };
   const updateActivity = (day, activity) => setItinerary((current) => current.map((item) => item.day === day ? { ...item, activity } : item));
 
+  const saveTrip = async () => {
+    if (!isAuthenticated) { onAuthRequired(); return; }
+    if (!itinerary.length) { setPlannerError('Generate an itinerary before saving it.'); return; }
+    setPlannerLoading(true);
+    setPlannerError('');
+    try {
+      const tripRequest = { name: `${selectedPlaces[0] || 'Nepal'} journey`, startDate: dates.start || null, endDate: dates.end || null, budget, travelStyle: style };
+      const trip = selectedTripId ? await fetchApi(`/api/trips/${selectedTripId}`, { method: 'PUT', body: JSON.stringify(tripRequest) }) : await fetchApi('/api/trips', { method: 'POST', body: JSON.stringify(tripRequest) });
+      const tripId = trip.id || selectedTripId;
+      const existingItems = savedTrips.find((savedTrip) => String(savedTrip.id) === String(tripId))?.items || [];
+      for (const item of itinerary) {
+        const destination = destinationLookup(item.place);
+        if (!destination?.id) continue;
+        const itemRequest = { destinationId: destination.id, dayNumber: item.day, notes: item.date, activities: item.activity };
+        const existingItem = existingItems.find((savedItem) => savedItem.dayNumber === item.day);
+        if (existingItem?.id) await fetchApi(`/api/trip-items/${existingItem.id}`, { method: 'PUT', body: JSON.stringify(itemRequest) });
+        else await fetchApi(`/api/trips/${tripId}/items`, { method: 'POST', body: JSON.stringify(itemRequest) });
+      }
+      const refreshed = await fetchApi('/api/trips');
+      setSavedTrips(refreshed);
+      setSelectedTripId(String(tripId));
+      setSaved(true);
+    } catch (error) {
+      setPlannerError(error.message || 'The trip could not be saved.');
+    } finally {
+      setPlannerLoading(false);
+    }
+  };
+
+  const loadTrip = async (tripId) => {
+    if (!tripId) return;
+    setPlannerLoading(true);
+    setPlannerError('');
+    try {
+      const trip = await fetchApi(`/api/trips/${tripId}`);
+      setSelectedTripId(String(trip.id));
+      setDates({ start: trip.startDate || '', end: trip.endDate || '' });
+      setBudget(trip.budget || budget);
+      setStyle(trip.travelStyle || style);
+      setItinerary((trip.items || []).map((item) => ({ day: item.dayNumber, date: item.notes || '', place: item.destination?.name || 'Nepal', activity: item.activities || '' })));
+      setSaved(true);
+    } catch (error) {
+      setPlannerError(error.message || 'The saved trip could not be loaded.');
+    } finally {
+      setPlannerLoading(false);
+    }
+  };
+
+  const deleteSavedTrip = async () => {
+    if (!selectedTripId) { setItinerary([]); return; }
+    setPlannerLoading(true);
+    try {
+      await fetchApi(`/api/trips/${selectedTripId}`, { method: 'DELETE' });
+      setSavedTrips((current) => current.filter((trip) => String(trip.id) !== String(selectedTripId)));
+      setSelectedTripId('');
+      setItinerary([]);
+      setSaved(false);
+    } catch (error) {
+      setPlannerError(error.message || 'The saved trip could not be deleted.');
+    } finally {
+      setPlannerLoading(false);
+    }
+  };
+
   return (
     <main className="planner-page">
       <section className="planner-hero">
@@ -843,15 +1324,17 @@ function TripPlanner({ onBack, initialPlaces = [] }) {
       </section>
       <section className="page-container planner-content">
         <div className="planner-heading"><div><p className="eyebrow">The trip builder</p><h2>Shape your<br /><em>journey.</em></h2></div><span>Step 1 of 1 · Personalize everything</span></div>
+        {isAuthenticated && savedTrips.length > 0 && <div className="saved-trip-bar"><label>Saved trips<select value={selectedTripId} onChange={(event) => { setSelectedTripId(event.target.value); loadTrip(event.target.value); }}><option value="">Choose a saved trip</option>{savedTrips.map((trip) => <option key={trip.id} value={trip.id}>{trip.name}</option>)}</select></label></div>}
+        {plannerError && <div className="auth-error" role="alert">{plannerError}</div>}
         <div className="planner-layout">
           <div className="planner-form">
             <section className="planner-panel"><h3>1. Choose destinations</h3><p>Select the places you want to include.</p><div className="place-check-grid">{plannerDestinations.map((place) => <label key={place} className={selectedPlaces.includes(place) ? 'checked' : ''}><input type="checkbox" checked={selectedPlaces.includes(place)} onChange={() => togglePlace(place)} /><span>{place}</span></label>)}</div><div className="add-place-row"><select value={newPlace} onChange={(event) => setNewPlace(event.target.value)}>{plannerDestinations.map((place) => <option key={place}>{place}</option>)}</select><button onClick={addPlace}>＋ Add destination</button></div></section>
-            <section className="planner-panel"><h3>2. When are you going?</h3><p>Dates help us pace your itinerary.</p><div className="date-fields"><label>Start date<input type="date" value={dates.start} onChange={(event) => setDates({ ...dates, start: event.target.value })} /></label><label>End date<input type="date" value={dates.end} onChange={(event) => setDates({ ...dates, end: event.target.value })} /></label></div></section>
+            <section className="planner-panel"><h3>2. When are you going?</h3><p>Dates help us pace your itinerary.</p><div className="date-fields"><label>Start date<input type="date" value={dates.start} onChange={(event) => setDates((current) => ({ ...current, start: event.target.value }))} /></label><label>End date<input type="date" value={dates.end} onChange={(event) => setDates((current) => ({ ...current, end: event.target.value }))} /></label></div></section>
             <section className="planner-panel"><h3>3. Choose your style</h3><div className="choice-pills">{travelStyles.map((item) => <button className={style === item ? 'selected' : ''} key={item} onClick={() => setStyle(item)}>{item}</button>)}</div><label className="planner-select-label">Estimated budget<select value={budget} onChange={(event) => setBudget(event.target.value)}><option>NPR 25,000 – 50,000</option><option>NPR 50,000 – 100,000</option><option>NPR 100,000 – 200,000</option><option>NPR 200,000+</option></select></label></section>
             <section className="planner-panel"><h3>4. What are you into?</h3><p>Pick as many interests as you like.</p><div className="interest-grid">{interests.map((item) => <button className={selectedInterests.includes(item) ? 'selected' : ''} key={item} onClick={() => toggleInterest(item)}>{selectedInterests.includes(item) ? '✓ ' : ''}{item}</button>)}</div></section>
             <button className="button button-primary generate-button" onClick={generateItinerary}>Generate my itinerary <ArrowIcon /></button>
           </div>
-          <aside className="itinerary-panel"><div className="itinerary-panel-head"><div><p className="eyebrow">Your Nepal itinerary</p><h3>{itinerary.length ? `${itinerary.length} day journey` : 'Your trip, ready to shape'}</h3></div>{itinerary.length > 0 && <button className="delete-itinerary" onClick={() => { setItinerary([]); setSaved(false); }}>Delete itinerary</button>}</div>{itinerary.length === 0 ? <div className="itinerary-empty"><span>✦</span><h4>Your route starts here.</h4><p>Select at least one destination and generate a suggested itinerary. You can edit every day afterwards.</p></div> : <><div className="trip-summary"><span>{style} trip</span><span>{budget}</span><span>{selectedInterests.length} interests</span></div><div className="itinerary-days">{itinerary.map((item, index) => <article className="itinerary-day" key={`${item.place}-${item.day}`}><div className="day-number">Day {item.day}</div><div className="day-content"><strong>{item.place}</strong><textarea value={item.activity} onChange={(event) => updateActivity(item.day, event.target.value)} aria-label={`Activities for day ${item.day}`} /><div className="day-controls"><button onClick={() => moveDay(index, -1)} disabled={index === 0}>↑ Move earlier</button><button onClick={() => moveDay(index, 1)} disabled={index === itinerary.length - 1}>↓ Move later</button><button onClick={() => removeDay(item.day)}>Remove</button></div></div></article>)}</div><button className={`save-itinerary ${saved ? 'saved' : ''}`} onClick={() => setSaved(true)}>{saved ? '✓ Itinerary saved for this session' : 'Save this itinerary'}</button></>}</aside>
+          <aside className="itinerary-panel"><div className="itinerary-panel-head"><div><p className="eyebrow">Your Nepal itinerary</p><h3>{itinerary.length ? `${itinerary.length} day journey` : 'Your trip, ready to shape'}</h3></div>{itinerary.length > 0 && <button className="delete-itinerary" onClick={deleteSavedTrip}>Delete itinerary</button>}</div>{itinerary.length === 0 ? <div className="itinerary-empty"><span>✦</span><h4>Your route starts here.</h4><p>Select at least one destination and generate a suggested itinerary. You can edit every day afterwards.</p></div> : <><div className="trip-summary"><span>{style} trip</span><span>{budget}</span><span>{selectedInterests.length} interests</span></div><div className="itinerary-days">{itinerary.map((item, index) => <article className="itinerary-day" key={`${item.place}-${item.day}`}><div className="day-number">Day {item.day}</div><div className="day-content"><strong>{item.place}</strong><textarea value={item.activity} onChange={(event) => updateActivity(item.day, event.target.value)} aria-label={`Activities for day ${item.day}`} /><div className="day-controls"><button onClick={() => moveDay(index, -1)} disabled={index === 0}>↑ Move earlier</button><button onClick={() => moveDay(index, 1)} disabled={index === itinerary.length - 1}>↓ Move later</button><button onClick={() => removeDay(item.day)}>Remove</button></div></div></article>)}</div><button className={`save-itinerary ${saved ? 'saved' : ''}`} onClick={saveTrip} disabled={plannerLoading}>{plannerLoading ? 'Saving…' : saved ? '✓ Trip saved' : isAuthenticated ? 'Save this trip' : 'Log in to save this trip'}</button></>}</aside>
         </div>
       </section>
     </main>
@@ -907,7 +1390,7 @@ function FavoritesPage({ favorites, onRemove, onOpen, onAddToTrip, onBack }) {
   );
 }
 
-function InformationHub({ onBack, onOpenDestination }) {
+function InformationHub({ onBack, onOpenDestination, guideData = [], festivalData = [], foodData = [] }) {
   const [activeTab, setActiveTab] = useState('guide');
   const [festivalRegion, setFestivalRegion] = useState('All regions');
   const [festivalTheme, setFestivalTheme] = useState('All themes');
@@ -942,9 +1425,9 @@ function InformationHub({ onBack, onOpenDestination }) {
       <section className="information-hero"><div className="page-container"><button className="explore-back" onClick={onBack}>← Home</button><p className="eyebrow light">Travel deeper</p><h1>Know Nepal<br /><em>before you go.</em></h1><p>Practical guidance, cultural context and useful planning tools for a more thoughtful journey.</p></div></section>
       <section className="page-container information-content">
         <div className="info-tabbar">{tabs.map(([key, label]) => <button key={key} className={activeTab === key ? 'selected' : ''} onClick={() => setActiveTab(key)}>{label}</button>)}</div>
-        {activeTab === 'guide' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan with confidence</p><h2>Travel <em>guide.</em></h2></div><span>Always verify time-sensitive details with official sources.</span></div><div className="guide-card-grid">{travelGuideSections.map(([title, text, note]) => <article className="guide-info-card" key={title}><span className="info-card-icon">✦</span><h3>{title}</h3><p>{text}</p><small>{note}</small></article>)}</div><div className="verification-note">Information here is general travel guidance, not legal, medical or emergency advice. Visa rules, fares, weather, opening hours and health requirements can change.</div></section>}
+        {activeTab === 'guide' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan with confidence</p><h2>Travel <em>guide.</em></h2></div><span>Always verify time-sensitive details with official sources.</span></div><div className="guide-card-grid">{guideData.map(([title, text, note]) => <article className="guide-info-card" key={title}><span className="info-card-icon">✦</span><h3>{title}</h3><p>{text}</p><small>{note}</small></article>)}</div><div className="verification-note">Information here is general travel guidance, not legal, medical or emergency advice. Visa rules, fares, weather, opening hours and health requirements can change.</div></section>}
         {activeTab === 'culture' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Stories, rituals and living heritage</p><h2>Nepal <em>culture.</em></h2></div><span>Dates shown below are approximate and change each year.</span></div><div className="culture-topic-grid">{cultureTopics.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{text}</p></article>)}</div><section className="terai-heritage-panel"><p className="eyebrow">People, places and living traditions</p><h2>Cultural Heritage <em>of Terai.</em></h2><p>The Terai is culturally diverse, with many communities, languages, foods, festivals, arts and religious practices. Chhath has particular prominence in the Terai/Madhesh, while Dashain, Tihar, Holi, Ram Navami, Maha Shivaratri, Krishna Janmashtami, Buddha Jayanti and other festivals are also celebrated widely across Nepal, with local expressions. Janakpur’s Mithila heritage, Tharu traditions, Muslim communities and many other local cultures make the plains a rich place to travel slowly and respectfully.</p></section><h3 className="subsection-title">Mithila Culture</h3><div className="culture-topic-grid"><article><span>01</span><h3>Janakpur as a cultural destination</h3><p>Explore Janaki Temple, Ram-Janaki traditions, sacred ponds, neighborhood celebrations and local cultural experiences.</p></article><article><span>02</span><h3>Art, architecture and crafts</h3><p>Mithila painting, decorated homes, textiles, pottery and other local crafts connect artistic practice with everyday life.</p></article><article><span>03</span><h3>Music, dance and cuisine</h3><p>Regional music and dance, festive clothing, Mithila foods, sweets and hospitality offer a grounded way to experience local culture.</p></article></div><h3 className="subsection-title">Explore Festivals</h3><div className="advanced-filters festival-filters"><label>Region<select value={festivalRegion} onChange={(event) => setFestivalRegion(event.target.value)}><option>All regions</option><option>Terai / Madhesh</option><option>Janakpur / Mithila</option><option>Kathmandu Valley</option><option>Across Nepal</option><option>Himalayan communities</option></select></label><label>Cultural theme<select value={festivalTheme} onChange={(event) => setFestivalTheme(event.target.value)}><option>All themes</option><option>Family and community</option><option>Religious observance</option><option>Arts and heritage</option><option>Seasonal celebration</option></select></label></div><div className="food-grid cultural-festival-grid">{festivalCards.filter(([name, description, region, ritual]) => (festivalRegion === 'All regions' || region.includes(festivalRegion) || (festivalRegion === 'Across Nepal' && region.includes('widely')) || (festivalRegion === 'Terai / Madhesh' && region.includes('Terai'))) && (festivalTheme === 'All themes' || (festivalTheme === 'Family and community' && ['Dashain', 'Tihar / Diwali', 'Holi'].includes(name)) || (festivalTheme === 'Religious observance' && !['Holi'].includes(name)) || (festivalTheme === 'Seasonal celebration' && ['Chhath', 'Holi'].includes(name)) || (festivalTheme === 'Arts and heritage' && ['Tihar / Diwali'].includes(name)))).map(([name, description, region, ritual, image]) => <article className="food-card" key={name}><img src={image} alt={`${name} festival`} /><div><span>{region}</span><h3>{name}</h3><p>{description}</p><small>{ritual}</small></div></article>)}</div><h3 className="subsection-title">Festival calendar</h3><div className="festival-guide-list">{festivals.map(([name, description, season]) => <article key={name}><div><h3>{name}</h3><strong>{season}</strong></div><p>{description}</p></article>)}</div></section>}
-        {activeTab === 'food' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Taste the journey</p><h2>Nepal <em>food guide.</em></h2></div><span>Ask about ingredients when dietary needs matter.</span></div><div className="food-grid">{foods.map(([name, description, region, diet, culture, image]) => <article className="food-card" key={name}><img src={image} alt={name} /><div><span>{region}</span><h3>{name}</h3><p>{description}</p><small>{diet}</small><em>{culture}</em></div></article>)}</div></section>}
+        {activeTab === 'food' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Taste the journey</p><h2>Nepal <em>food guide.</em></h2></div><span>Ask about ingredients when dietary needs matter.</span></div><div className="food-grid">{foodData.map(([name, description, region, diet, culture, image]) => <article className="food-card" key={name}><img src={image || fallbackDestinationImage} alt={name} /><div><span>{region}</span><h3>{name}</h3><p>{description}</p><small>{diet}</small><em>{culture}</em></div></article>)}</div></section>}
         {activeTab === 'weather' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan for the conditions</p><h2>Nepal <em>weather.</em></h2></div><span>Live data requires an optional weather API configuration.</span></div><div className="weather-tool"><div className="weather-selector"><label>Select a destination<select value={weatherPlace} onChange={(event) => loadWeather(event.target.value)}>{destinationCatalog.slice(0, 8).map((destination) => <option key={destination.name}>{destination.name}</option>)}</select></label><p>Best travel season: <strong>{destinationCatalog.find((destination) => destination.name === weatherPlace)?.season || 'Autumn / Spring'}</strong></p></div><div className="weather-result">{weatherLoading ? <p>Loading current weather…</p> : weather ? <><span>Current weather</span><strong>{weather.temperature}°</strong><p>{weather.condition}</p><small>Forecast data supplied by the configured provider.</small></> : <><span>Current weather unavailable</span><strong>—</strong><p>Configure <code>VITE_WEATHER_API_URL</code> to enable live weather for this destination.</p><small>Use official weather information before departure.</small></>}</div></div><div className="season-grid"><div><strong>Spring</strong><span>Clear mountain views and rhododendron blooms.</span></div><div><strong>Summer / monsoon</strong><span>Green landscapes; rain can affect roads and flights.</span></div><div><strong>Autumn</strong><span>Popular trekking season with generally clear skies.</span></div><div><strong>Winter</strong><span>Cool cities and cold high-altitude conditions.</span></div></div></section>}
         {activeTab === 'map' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Find your way</p><h2>Nepal <em>on the map.</em></h2></div><span>Map markers are an overview; confirm routes locally.</span></div><div className="tourism-map"><div className="map-landscape"><span className="map-label">NEPAL</span>{mapDestinations.map((destination, index) => <button key={destination.id} className={`map-marker marker-${index + 1}`} onClick={() => onOpenDestination(destination)} title={destination.name}>●<span>{destination.name}</span></button>)}</div><div className="map-destination-list">{mapDestinations.map((destination) => <button key={destination.id} onClick={() => onOpenDestination(destination)}><DestinationImage destination={destination} alt="" /><span><strong>{destination.name}</strong><small>{destination.description}</small></span><ArrowIcon /></button>)}</div></div><div className="verification-note">For routing, boundaries and live transport conditions, use an official map provider and local advisories. No map API key is required for this lightweight overview.</div></section>}
       </section>
@@ -957,14 +1440,20 @@ function App() {
   const [language, setLanguage] = useState('EN');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
-  const [favorites, setFavorites] = useState(() => {
+  const [authPanelOpen, setAuthPanelOpen] = useState(false);
+  const [authenticatedUser, setAuthenticatedUser] = useState(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('nepal-tourism-favorites') || '[]');
-      return stored.map((value) => destinationById[value]?.id || destinationCatalog.find((destination) => destination.name === value)?.id).filter(Boolean);
+      return JSON.parse(localStorage.getItem('nepal-tourism-user') || 'null');
     } catch {
-      return [];
+      return null;
     }
   });
+  const [experiences, setExperiences] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+  const [favorites, setFavorites] = useState([]);
+  const [favoriteLoading, setFavoriteLoading] = useState(null);
+  const isAuthenticated = Boolean(authenticatedUser && localStorage.getItem('nepal-tourism-token'));
   const [filters, setFilters] = useState({
     region: 'All regions',
     category: 'All categories',
@@ -986,6 +1475,69 @@ function App() {
   const [informationOpen, setInformationOpen] = useState(false);
   const [regionOpen, setRegionOpen] = useState(null);
   const pageSize = 6;
+
+  useEffect(() => {
+    const token = localStorage.getItem('nepal-tourism-token');
+    if (!token) return undefined;
+    fetchApi('/api/profile').then((profile) => {
+      localStorage.setItem('nepal-tourism-user', JSON.stringify(profile));
+      setAuthenticatedUser(profile);
+    }).catch(() => {
+      localStorage.removeItem('nepal-tourism-token');
+      localStorage.removeItem('nepal-tourism-user');
+      setAuthenticatedUser(null);
+    });
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    const expire = () => setAuthenticatedUser(null);
+    window.addEventListener('nepal-tourism-auth-expired', expire);
+    const requireAuth = () => setAuthPanelOpen(true);
+    window.addEventListener('nepal-tourism-auth-required', requireAuth);
+    return () => {
+      window.removeEventListener('nepal-tourism-auth-expired', expire);
+      window.removeEventListener('nepal-tourism-auth-required', requireAuth);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setFavorites([]); return undefined; }
+    fetchApi('/api/favorites').then((items) => setFavorites(items.map((item) => item.destinationId))).catch(() => setFavorites([]));
+    return undefined;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadCatalog = async () => {
+      try {
+        setCatalogLoading(true);
+        const [destinationData, experienceData, guideData, festivalData, foodData] = await Promise.all([
+          fetchApi('/api/destinations', { signal: controller.signal }),
+          fetchApi('/api/experiences', { signal: controller.signal }),
+          fetchApi('/api/travel-guide', { signal: controller.signal }),
+          fetchApi('/api/festivals', { signal: controller.signal }),
+          fetchApi('/api/foods', { signal: controller.signal }),
+        ]);
+        applyBackendDestinations(destinationData);
+        applyBackendInformation({ guide: guideData, festivals: festivalData, food: foodData });
+        setExperiences(experienceData.map((experience) => ({
+          ...experience,
+          image: experienceImageByName[experience.name] || experience.image || fallbackExperiences[0].image,
+          locations: experience.locations || [],
+        })));
+        setCatalogError('');
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setCatalogError('Tourism data could not be loaded from the local API.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setCatalogLoading(false);
+      }
+    };
+    loadCatalog();
+    return () => controller.abort();
+  }, []);
 
   const filteredDestinations = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -1011,13 +1563,23 @@ function App() {
 
   const visibleDestinations = filteredDestinations.slice(0, page * pageSize);
 
-  const toggleFavorite = (id) => {
-    setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const toggleFavorite = async (id) => {
+    if (!isAuthenticated) { setAuthPanelOpen(true); return; }
+    setFavoriteLoading(id);
+    try {
+      if (favorites.includes(id)) {
+        await fetchApi(`/api/favorites/${id}`, { method: 'DELETE' });
+        setFavorites((current) => current.filter((item) => item !== id));
+      } else {
+        await fetchApi(`/api/favorites/${id}`, { method: 'POST' });
+        setFavorites((current) => [...current, id]);
+      }
+    } catch (error) {
+      setCatalogError(error.message || 'Favorite could not be updated.');
+    } finally {
+      setFavoriteLoading(null);
+    }
   };
-
-  useEffect(() => {
-    localStorage.setItem('nepal-tourism-favorites', JSON.stringify(favorites));
-  }, [favorites]);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -1130,6 +1692,12 @@ function App() {
     setMenuOpen(false);
   };
 
+  const logout = () => {
+    localStorage.removeItem('nepal-tourism-token');
+    localStorage.removeItem('nepal-tourism-user');
+    setAuthenticatedUser(null);
+  };
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -1150,12 +1718,16 @@ function App() {
         </nav>
         <div className="header-actions">
           <label className="language-select"><span className="globe">◎</span><select value={language} onChange={(event) => setLanguage(event.target.value)} aria-label="Choose language"><option value="EN">EN</option><option value="NE">नेपाली</option><option value="DE">DE</option></select></label>
-          <button className="login-link">Log in <ArrowIcon /></button>
+          {authenticatedUser ? <button className="login-link" onClick={logout} title="Log out">{authenticatedUser.name || 'Account'} · Log out</button> : <button className="login-link" onClick={() => setAuthPanelOpen(true)}>Log in <ArrowIcon /></button>}
         </div>
       </header>
 
+      {authPanelOpen && <AuthPanel onClose={() => setAuthPanelOpen(false)} onAuthenticated={setAuthenticatedUser} />}
+
+      {catalogError && <div className="page-container empty-state" role="alert">{catalogError} Check that the Spring Boot backend is running on port 8080.</div>}
+
       <main id="top">
-        {selectedDestination ? <DestinationDetails destination={selectedDestination} favorite={favorites.includes(selectedDestination.id)} onFavorite={toggleFavorite} onBack={closeDestination} onAddToTrip={openPlannerWithPlace} /> : regionOpen ? <RegionPage regionKey={regionOpen} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={openDestination} onBack={() => { setRegionOpen(null); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : exploreOpen ? <ExploreNepal selectedRegion={selectedRegion} onSelectRegion={setSelectedRegion} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={(destination) => { setExploreOpen(false); openDestination(destination); }} onBack={() => { setExploreOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : experiencesOpen ? <ExperiencesPage onBack={() => { setExperiencesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : plannerOpen ? <TripPlanner initialPlaces={plannerPlaces} onBack={() => { setPlannerOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : favoritesOpen ? <FavoritesPage favorites={favorites} onRemove={toggleFavorite} onOpen={(destination) => { setFavoritesOpen(false); openDestination(destination); }} onAddToTrip={openPlannerWithPlace} onBack={() => { setFavoritesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : informationOpen ? <InformationHub onBack={() => { setInformationOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onOpenDestination={(destination) => { setInformationOpen(false); openDestination(destination); }} /> : <>
+        {selectedDestination ? <DestinationDetails destination={selectedDestination} favorite={favorites.includes(selectedDestination.id)} onFavorite={toggleFavorite} onBack={closeDestination} onAddToTrip={openPlannerWithPlace} /> : regionOpen ? <RegionPage regionKey={regionOpen} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={openDestination} onBack={() => { setRegionOpen(null); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : exploreOpen ? <ExploreNepal selectedRegion={selectedRegion} onSelectRegion={setSelectedRegion} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={(destination) => { setExploreOpen(false); openDestination(destination); }} onBack={() => { setExploreOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : experiencesOpen ? <ExperiencesPage experiences={experiences} onBack={() => { setExperiencesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : plannerOpen ? <TripPlanner initialPlaces={plannerPlaces} onBack={() => { setPlannerOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : favoritesOpen ? <FavoritesPage favorites={favorites} onRemove={toggleFavorite} onOpen={(destination) => { setFavoritesOpen(false); openDestination(destination); }} onAddToTrip={openPlannerWithPlace} onBack={() => { setFavoritesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : informationOpen ? <InformationHub guideData={travelGuideSections} festivalData={festivalCards} foodData={foods} onBack={() => { setInformationOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onOpenDestination={(destination) => { setInformationOpen(false); openDestination(destination); }} /> : <>
         <section className="dashboard-hero">
           <div className="hero-image" /><div className="hero-overlay" />
           <div className="page-container hero-dashboard-content">
@@ -1215,7 +1787,7 @@ function App() {
           <button className="load-more" onClick={() => { setCategory('Kathmandu Valley'); setPage(1); document.getElementById('destinations')?.scrollIntoView({ behavior: 'smooth' }); }}>View All Kathmandu Valley Places <ArrowIcon /></button>
         </section>
 
-        <section className="experiences-section" id="experiences"><div className="page-container"><SectionTitle eyebrow="Go beyond the postcard" title={<>Top <em>experiences.</em></>} /><div className="experience-grid">{experiences.slice(0, 3).map((experience, index) => <article className="experience-tile" key={experience.name}><span className="experience-number">{String(index + 1).padStart(2, '0')}</span><span className="experience-icon">↗</span><p>{experience.difficulty}</p><h3>{experience.name}</h3><span>{experience.description}</span><button onClick={openExperiences}>Discover <ArrowIcon /></button></article>)}</div></div></section>
+        <section className="experiences-section" id="experiences"><div className="page-container"><SectionTitle eyebrow="Go beyond the postcard" title={<>Top <em>experiences.</em></>} /><div className="experience-grid">{catalogLoading ? <div className="empty-state">Loading experiences...</div> : experiences.slice(0, 3).map((experience, index) => <article className="experience-tile" key={experience.id || experience.name}><span className="experience-number">{String(index + 1).padStart(2, '0')}</span><span className="experience-icon">↗</span><p>{experience.difficulty}</p><h3>{experience.name}</h3><span>{experience.description}</span><button onClick={openExperiences}>Discover <ArrowIcon /></button></article>)}</div></div></section>
 
         <section className="dashboard-section page-container" id="categories"><SectionTitle eyebrow="Find your way" title={<>Explore by <em>category.</em></>} /><div className="category-grid">{categories.map(([icon, name, count, image]) => <a className="category-tile" href="#destinations" key={name}><img src={image} alt="" /><div className="category-shade" /><span className="category-icon">{icon}</span><div><h3>{name}</h3><p>{count} <ArrowIcon /></p></div></a>)}</div></section>
 
