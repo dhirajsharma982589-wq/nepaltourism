@@ -1,0 +1,123 @@
+{
+  "nav": {
+    "home": "Home",
+    "destinations": "Destinations",
+    "explore": "Explore Nepal",
+    "experiences": "Experiences",
+    "planner": "Trip Planner",
+    "favorites": "My Favorites",
+    "categories": "Categories",
+    "guide": "Travel Guide",
+    "emergency": "Emergency Contacts",
+    "notifications": "Notifications"
+  },
+  "auth": {
+    "login": "Log in",
+    "logout": "Log out",
+    "register": "Register",
+    "account": "Account",
+    "pleaseWait": "Please wait…",
+    "createAccount": "Create account",
+    "welcome": "Welcome to Nepal",
+    "joinJourney": "Join the journey.",
+    "logInTitle": "Log in.",
+    "success": "Registration successful. You can now log in.",
+    "errorInvalid": "Invalid email or password.",
+    "errorFields": "Please check the form fields.",
+    "errorPermission": "You do not have permission to complete this request.",
+    "errorUnavailable": "The authentication service is unavailable. Please try again."
+  },
+  "hero": {
+    "eyebrow": "Your next great story starts here",
+    "title": "Discover",
+    "titleEm": "Nepal",
+    "description": "Explore the Himalayas, experience ancient culture, and find unforgettable places made for your kind of adventure.",
+    "exploreButton": "Explore Nepal",
+    "planButton": "Plan your trip",
+    "statsUNESCO": "UNESCO sites",
+    "statsPeaks": "Highest peaks",
+    "statsWander": "Ways to wander",
+    "searchPlaceholder": "Search destinations, activities or regions",
+    "searchButton": "Search"
+  },
+  "sections": {
+    "popularDestinations": "Popular destinations.",
+    "popularEyebrow": "Start exploring",
+    "topExperiences": "Top experiences.",
+    "exploreByCategory": "Explore by category.",
+    "categoriesEyebrow": "Find your way",
+    "festivals": "Nepal festivals.",
+    "festivalsEyebrow": "A calendar of color",
+    "recommendedEyebrow": "Picked for curious travelers",
+    "recommended": "Recommended for you.",
+    "exploreNepal": "Explore Nepal by region.",
+    "exploreEyebrow": "One country, three landscapes",
+    "kathmanduValley": "Discover Kathmandu Valley.",
+    "kathmanduEyebrow": "Temples, heritage & famous places",
+    "kathmanduPlaces": "Kathmandu Valley places.",
+    "kathmanduPlacesEyebrow": "Living heritage in three historic cities"
+  },
+  "common": {
+    "loading": "Loading…",
+    "loadMore": "Load more",
+    "back": "← Home",
+    "backToHome": "Back to home",
+    "clearAll": "Clear all",
+    "showing": "Showing",
+    "of": "of",
+    "destinations": "destinations",
+    "noResults": "No destinations match that search yet. Try another region or category.",
+    "error": "Could not load data.",
+    "backendError": "Tourism data could not be loaded from the local API.",
+    "backendNote": "Check that the Spring Boot backend is running on port 8080."
+  },
+  "emergency": {
+    "eyebrow": "Safety first",
+    "title": "Emergency Contacts",
+    "subtitle": "Dial these verified emergency services if you need urgent assistance anywhere in Nepal.",
+    "call": "Call",
+    "unavailable": "Number currently unavailable",
+    "actionLabel": "What to do",
+    "verificationNote": "Verification",
+    "callNow": "Call now",
+    "backendError": "Could not load emergency contacts. Showing verified backup data.",
+    "loading": "Loading emergency contacts…",
+    "important": "In any life-threatening emergency, also ask your hotel, guide or local host for assistance. Response times vary in remote areas."
+  },
+  "notifications": {
+    "eyebrow": "Stay informed",
+    "title": "Travel Notifications",
+    "subtitle": "Current travel information and seasonal notices for Nepal.",
+    "empty": "No active notifications at this time.",
+    "loading": "Loading notifications…",
+    "error": "Notifications could not be loaded.",
+    "types": {
+      "TRAVEL": "Travel",
+      "FESTIVAL": "Festival",
+      "DESTINATION": "Destination",
+      "TREKKING": "Trekking",
+      "WEATHER": "Weather",
+      "GENERAL": "General"
+    },
+    "priorities": {
+      "LOW": "Low priority",
+      "NORMAL": "Normal priority",
+      "HIGH": "High priority"
+    }
+  },
+  "filters": {
+    "region": "Region",
+    "area": "Area",
+    "type": "Type",
+    "category": "Category",
+    "difficulty": "Difficulty",
+    "budget": "Budget",
+    "season": "Season",
+    "sortBy": "Sort by"
+  },
+  "guide": {
+    "title": "Travel Guide",
+    "eyebrow": "Travel well",
+    "subtitle": "Good to know before you go."
+  }
+}

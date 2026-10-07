@@ -1,9 +1,5 @@
 -- Optional reference schema for MySQL deployments.
 -- Spring JPA manages the same tables through application.properties.
-CREATE TABLE IF NOT EXISTS roles (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(40) NOT NULL UNIQUE
-);
 
 CREATE TABLE IF NOT EXISTS regions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -151,7 +147,22 @@ CREATE TABLE IF NOT EXISTS foods (
 CREATE TABLE IF NOT EXISTS emergency_contacts (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(150) NOT NULL,
-  phone VARCHAR(60) NOT NULL,
+  phone VARCHAR(60),
   description VARCHAR(255),
+  service_type VARCHAR(60),
+  action_info VARCHAR(255),
+  available BOOLEAN NOT NULL DEFAULT TRUE,
   verification_note VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(200) NOT NULL,
+  message TEXT NOT NULL,
+  type VARCHAR(20) NOT NULL,
+  destination VARCHAR(120),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  priority VARCHAR(10) NOT NULL DEFAULT 'NORMAL',
+  expires_at TIMESTAMP NULL
 );

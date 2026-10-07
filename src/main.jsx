@@ -2,6 +2,20 @@ import React, { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { buildApiUrl, fetchApi } from './apiConfig';
+import { getDestinationLocation } from './data/destinationLocations';
+import { WeatherWidget } from './components/WeatherWidget';
+import { InteractiveMap } from './components/InteractiveMap';
+import { HotelCard } from './components/HotelCard';
+import { RestaurantCard } from './components/RestaurantCard';
+import { TransportationCard } from './components/TransportationCard';
+import { TrekkingRouteCard } from './components/TrekkingRouteCard';
+import { TrekkingRouteDetails } from './components/TrekkingRouteDetails';
+import { AITravelAssistant } from './components/AITravelAssistant';
+import logoUrl from './assets/nepal-tourism-logo.svg';
+import { useTranslation } from 'react-i18next';
+import { EmergencyContacts } from './components/EmergencyContacts';
+import { TravelNotifications } from './components/TravelNotifications';
+import './i18n';
 
 const destinations = [
   {
@@ -41,7 +55,7 @@ const destinations = [
     category: 'Culture & Heritage',
     description: 'Explore living heritage, golden temples and centuries of stories in every courtyard.',
     rating: '4.8',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/c/ce/Three_saddhus_at_Kathmandu_Durbar_Square.jpg',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/c/c8/Kathmandu_Avion_01.JPG',
     region: 'Bagmati',
     filterCategory: 'Kathmandu Valley',
     difficulty: 'Easy',
@@ -577,6 +591,8 @@ function applyBackendInformation({ guide, festivals: festivalRecords, food: food
     item.region?.name || item.season || 'Nepal',
     item.culturalSignificance || item.season || 'Dates vary yearly; verify the local calendar.',
     item.imageUrl || '',
+    item.dateInformation || 'Dates vary by year; verify the local calendar.',
+    item.dateKnown,
   ]);
   foods = foodRecords.map((item) => [
     item.name,
@@ -799,6 +815,8 @@ function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddTo
       alert('Destination link copied to your clipboard.');
     }
   };
+  const destinationLocation = getDestinationLocation(destination);
+  const reviewAverage = reviews.length ? (reviews.reduce((total, review) => total + Number(review.rating || 0), 0) / reviews.length).toFixed(1) : null;
 
   return (
     <main className="destination-detail">
@@ -814,6 +832,8 @@ function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddTo
           <span className="category-pill detail-pill">{destination.category}</span>
           <h1>{destination.name}</h1>
           <div className="detail-location">⌖ {destination.location} <strong>★ {destination.rating}</strong><span>128 traveler reviews</span></div>
+                    <div className="detail-location">⌖ {destination.location} {reviewAverage ? <strong>★ {reviewAverage}</strong> : <strong>No ratings yet</strong>}<span>{reviews.length ? `${reviews.length} traveler review${reviews.length === 1 ? '' : 's'}` : 'No reviews yet'}</span></div>
+                    <section className="detail-block review-section"><div className="review-heading"><div><p className="eyebrow">Traveler voices</p><h2>User <em>reviews.</em></h2></div><strong>{reviewAverage ? `★ ${reviewAverage}` : 'No ratings yet'}<small>{reviews.length ? ` / ${reviews.length} review${reviews.length === 1 ? '' : 's'}` : ''}</small></strong></div>{reviews.length ? reviews.map((review) => { const isOwnReview = isAuthenticated && authenticatedUser?.email === review.userEmail; return <article className="review-card" key={review.id}><div className="review-avatar">{review.user?.slice(0, 2).toUpperCase() || 'TR'}</div><div><strong>{review.user}</strong><span>★ {review.rating}</span><p>{review.comment}</p>{isOwnReview && <div className="review-actions"><button type="button" onClick={() => editReview(review)}>Edit</button><button type="button" onClick={() => deleteReview(review.id)} disabled={reviewLoading}>Delete</button></div>}</div></article>; }) : <p className="review-empty">No reviews yet. Be the first to share your experience.</p>}<form className="review-form" onSubmit={submitReview}><label>Rating<select value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><label>{editingReviewId ? 'Edit your experience' : 'Share your experience'}<textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Tell future travelers what you loved..." required /></label><button className="button button-dark" type="submit" disabled={reviewLoading}>{reviewLoading ? 'Saving…' : editingReviewId ? 'Save changes' : isAuthenticated ? 'Post review' : 'Log in to review'}</button>{editingReviewId && <button type="button" className="button button-outline" onClick={() => { setEditingReviewId(null); setReviewText(''); }}>Cancel edit</button>}{reviewSubmitted && <span className="review-success">{reviewWasEdited ? 'Your review was updated.' : 'Your review was added.'}</span>}{reviewError && <span className="review-error">{reviewError}</span>}</form></section>
           <p>{destination.description} Discover the character of this place at your own pace, with thoughtful experiences for curious travelers.</p>
           <div className="detail-actions"><button className={`button ${favorite ? 'button-primary' : 'button-dark'}`} onClick={() => onFavorite(destination.id)}>{favorite ? '♥ Saved' : '♡ Add to favorites'}</button><button className="button button-outline" onClick={() => onAddToTrip(destination.name)}>＋ Add to trip</button><button className="share-button" onClick={shareDestination} aria-label="Share destination">↗</button></div>
           <div className="detail-facts"><div><span>Best season</span><strong>{details.bestTime}</strong></div><div><span>Difficulty</span><strong>{destination.difficulty}</strong></div><div><span>Typical stay</span><strong>{isPokhara ? '2–4 days' : '1–3 days'}</strong></div></div>
@@ -831,7 +851,18 @@ function DestinationDetails({ destination, favorite, onFavorite, onBack, onAddTo
           <section className="detail-block safety-block"><h3>{destinationGuide ? 'Responsible tourism' : 'Safety tips'}</h3><p>{destinationGuide?.responsible || 'Keep valuables secure, respect local customs, carry water and check local weather before heading outdoors. For treks, use a registered guide and allow time to acclimatize.'}</p></section>
           <section className="detail-block review-section"><div className="review-heading"><div><p className="eyebrow">Traveler voices</p><h2>User <em>reviews.</em></h2></div><strong>★ {destination.rating}<small> / 5.0 average</small></strong></div>{reviews.length ? reviews.map((review) => { const isOwnReview = isAuthenticated && authenticatedUser?.name === review.userEmail; return <article className="review-card" key={review.id}><div className="review-avatar">{review.user?.slice(0, 2).toUpperCase() || 'TR'}</div><div><strong>{review.user}</strong><span>★ {review.rating}</span><p>{review.comment}</p>{isOwnReview && <div className="review-actions"><button type="button" onClick={() => editReview(review)}>Edit</button><button type="button" onClick={() => deleteReview(review.id)} disabled={reviewLoading}>Delete</button></div>}</div></article>; }) : <p className="review-empty">No reviews yet. Be the first to share your experience.</p>}<form className="review-form" onSubmit={submitReview}><label>Rating<select value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><label>{editingReviewId ? 'Edit your experience' : 'Share your experience'}<textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Tell future travelers what you loved..." required /></label><button className="button button-dark" type="submit" disabled={reviewLoading}>{reviewLoading ? 'Saving…' : editingReviewId ? 'Save changes' : isAuthenticated ? 'Post review' : 'Log in to review'}</button>{editingReviewId && <button type="button" className="button button-outline" onClick={() => { setEditingReviewId(null); setReviewText(''); }}>Cancel edit</button>}{reviewSubmitted && <span className="review-success">{reviewWasEdited ? 'Your review was updated.' : 'Your review was added.'}</span>}{reviewError && <span className="auth-error" role="alert">{reviewError}</span>}</form></section>
         </div>
-        <aside className="detail-sidebar"><div className="weather-card"><p className="eyebrow light">Live travel snapshot</p><span className="weather-icon">☼</span><strong>18°</strong><span>Partly cloudy</span><small>Good conditions for exploring</small></div><div className="map-card"><div className="map-art"><span>⌖</span><i /><i /><i /></div><div><p className="eyebrow">Find your way</p><h3>{destination.name} map</h3><p>View this destination and nearby places on a map.</p><a href={`https://www.google.com/maps/search/${encodeURIComponent(destination.name + ' Nepal')}`} target="_blank" rel="noreferrer">Open in Maps <ArrowIcon /></a></div></div></aside>
+        <aside className="detail-sidebar">
+          <WeatherWidget destination={destination} />
+          <div className="map-card">
+            <div className="map-art"><span>⌖</span><i /><i /><i /></div>
+            <div>
+              <p className="eyebrow">Find your way</p>
+              <h3>{destination.name} map</h3>
+              <p>{destinationLocation ? `Use OpenStreetMap coordinates for ${destination.name}.` : 'View this destination and nearby places on a map.'}</p>
+              <a href={destinationLocation?.directionsLink || `https://www.google.com/maps/search/${encodeURIComponent(destination.name + ' Nepal')}`} target="_blank" rel="noreferrer">Open in Maps <ArrowIcon /></a>
+            </div>
+          </div>
+        </aside>
       </section>
     </main>
   );
@@ -917,12 +948,12 @@ function ExploreNepal({ selectedRegion, onSelectRegion, onExploreDestination, on
   );
 }
 
-function ExperienceCard({ experience, index }) {
+function ExperienceCard({ experience, index, favorite = false, onFavorite }) {
   const locations = experience.locations || [];
 
   return (
     <article className="experience-detail-card">
-      <div className="experience-detail-image"><img src={experience.image} alt={experience.name} /><span>{String(index + 1).padStart(2, '0')}</span><button aria-label={`Save ${experience.name}`}>♡</button></div>
+      <div className="experience-detail-image"><img src={experience.image} alt={experience.name} /><span>{String(index + 1).padStart(2, '0')}</span><button aria-label={`${favorite ? 'Remove' : 'Save'} ${experience.name}`} onClick={() => onFavorite?.(experience)}>{favorite ? '♥' : '♡'}</button></div>
       <div className="experience-detail-body">
         <p className="eyebrow">{experience.difficulty} experience</p>
         <h3>{experience.name}</h3>
@@ -943,7 +974,7 @@ function ExperienceCard({ experience, index }) {
   );
 }
 
-function ExperiencesPage({ onBack, experiences: initialExperiences = [] }) {
+function ExperiencesPage({ onBack, experiences: initialExperiences = [], savedItems = [], onFavoriteItem = () => {} }) {
   const [experiences, setExperiences] = useState(initialExperiences);
   const [loadingExperiences, setLoadingExperiences] = useState(true);
   const [experienceError, setExperienceError] = useState('');
@@ -995,15 +1026,15 @@ function ExperiencesPage({ onBack, experiences: initialExperiences = [] }) {
         <div className="explore-heading"><div><p className="eyebrow">Make it memorable</p><h2>Adventure &<br /><em>experiences.</em></h2></div><span>{loadingExperiences ? 'Loading...' : `${experiences.length} ways to explore`}</span></div>
         {experienceError && <div className="empty-state" role="alert">{experienceError}</div>}
         <div className="experience-category-tabs">{categories.map((category) => <button key={category} className={activeCategory === category ? 'selected' : ''} onClick={() => setActiveCategory(category)}>{category}</button>)}</div>
-        <div className="experience-detail-grid">{visibleExperiences.map((experience, index) => <ExperienceCard experience={experience} index={index} key={experience.id || experience.name} />)}</div>
+        <div className="experience-detail-grid">{visibleExperiences.map((experience, index) => <ExperienceCard experience={experience} index={index} favorite={savedItems.includes(`experience:${experience.id}`)} onFavorite={() => onFavoriteItem('experience', experience)} key={experience.id || experience.name} />)}</div>
       </section>
     </main>
   );
 }
 
-function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(localStorage.getItem('nepal-tourism-token')), onAuthRequired = () => window.dispatchEvent(new Event('nepal-tourism-auth-required')), destinationLookup = (name) => destinationCatalog.find((destination) => destination.name.toLowerCase() === name.toLowerCase()) }) {
+function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(localStorage.getItem('nepal-tourism-token')), onAuthRequired = () => window.dispatchEvent(new Event('nepal-tourism-auth-required')), destinationLookup = (name) => destinationCatalog.find((destination) => destination.name.toLowerCase() === name.toLowerCase()), foodData = [], festivalData = [], transportationData = [] }) {
   const travelStyles = ['Budget', 'Standard', 'Luxury', 'Adventure', 'Family', 'Cultural', 'Nature'];
-  const interests = ['Mountains', 'Trekking', 'Culture', 'Food', 'Wildlife', 'Photography', 'Adventure', 'Spirituality', 'History'];
+  const interests = ['Mountains', 'Trekking', 'Culture', 'Food', 'Festivals', 'Transportation', 'Wildlife', 'Photography', 'Adventure', 'Spirituality', 'History'];
   const plannerDestinations = ['Kathmandu Valley', 'Pokhara', 'Chitwan National Park', 'Everest Base Camp', 'Bandipur', 'Lumbini', 'Rara Lake', 'Mardi Himal'];
   const [selectedPlaces, setSelectedPlaces] = useState(initialPlaces.length ? initialPlaces : ['Kathmandu Valley', 'Pokhara']);
   const [dates, setDates] = useState({ start: '', end: '' });
@@ -1063,7 +1094,7 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
 
   const getDestinationMealRecommendation = (place, budgetProfile, interestsSet) => {
     const normalized = place.toLowerCase();
-    const foodPreferences = ['Dal Bhat', 'Momo', 'Thukpa', 'Newari cuisine', 'Sel Roti'];
+    const foodPreferences = foodData.map((item) => item[0]).filter(Boolean);
 
     if (normalized.includes('kathmandu') || normalized.includes('bhaktapur') || normalized.includes('lalitpur')) {
       return budgetProfile === 'luxury' ? 'Newari fine dining and rooftop coffee in Kathmandu Valley' : budgetProfile === 'budget' ? 'Momo, dal bhat and local tea houses in the old streets' : 'Newari cuisine and neighborhood cafés around the heritage squares';
@@ -1086,7 +1117,7 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
       return budgetProfile === 'budget' ? 'Local cafés, regional snacks and simple family-run meals' : 'Traditional local dishes and relaxed sit-down dining';
     }
 
-    return foodPreferences[Math.min(foodPreferences.length - 1, Math.max(0, Math.abs(place.length) % foodPreferences.length))];
+    return foodPreferences.length ? foodPreferences[Math.min(foodPreferences.length - 1, Math.max(0, Math.abs(place.length) % foodPreferences.length))] : 'Local Nepali food; verify current menus and dietary information locally.';
   };
 
   const getDestinationActivityPlan = (place, dayIndex, totalDays, styleProfile, budgetProfile, interestSet) => {
@@ -1098,6 +1129,10 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
     const wantsWildlife = interestSet.includes('wildlife');
     const wantsSpirituality = interestSet.includes('spirituality');
     const wantsFood = interestSet.includes('food');
+    const wantsFestivals = interestSet.includes('festivals');
+    const wantsTransportation = interestSet.includes('transportation');
+    const festivalName = festivalData[0]?.[0];
+    const transportName = transportationData[0]?.name;
 
     let morning = 'Start with a slow breakfast and a walk around the local neighborhood.';
     let afternoon = 'Enjoy a well-paced local highlight and some time to take in the setting.';
@@ -1163,6 +1198,14 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
       afternoon = wantsAdventure ? 'Continue the active component and keep the rest of the day lighter.' : afternoon;
     }
 
+    if (wantsFestivals && festivalName) {
+      afternoon = `${afternoon} Check the Festival Calendar for ${festivalName}; annual dates vary and should be verified.`;
+    }
+
+    if (wantsTransportation) {
+      travelNote = transportName ? `${transportName} is listed as a planning reference; verify current routes, fares and schedules before departure.` : 'Verify current local transport, routes, fares and schedules before departure.';
+    }
+
     return { morning, afternoon, evening, travelNote };
   };
 
@@ -1205,12 +1248,20 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
     const endDateValue = parseDateValue(dates.end);
     const dateCount = getDayCount(dates.start, dates.end);
 
-    if (!startDateValue || !endDateValue || dateCount === 0) {
+    if (!selectedPlaces.length) {
       setItinerary([]);
+      setPlannerError('Select at least one destination before generating your itinerary.');
       return;
     }
 
-    const places = selectedPlaces.length ? selectedPlaces : ['Kathmandu Valley'];
+    if (!startDateValue || !endDateValue || dateCount === 0) {
+      setItinerary([]);
+      setPlannerError('Choose a valid start and end date for your itinerary.');
+      return;
+    }
+
+    setPlannerError('');
+    const places = selectedPlaces;
     const daySequence = distributeSelectedPlaces(places, dateCount);
     const budgetProfile = getBudgetProfile(budget);
     const styleProfile = style.toLowerCase();
@@ -1341,7 +1392,7 @@ function TripPlanner({ onBack, initialPlaces = [], isAuthenticated = Boolean(loc
   );
 }
 
-function FavoritesPage({ favorites, onRemove, onOpen, onAddToTrip, onBack }) {
+function FavoritesPage({ favorites, savedItemRecords = [], onRemove, onRemoveItem, onOpen, onAddToTrip, onBack }) {
   const savedDestinations = destinationCatalog.filter((destination) => favorites.includes(destination.id));
 
   return (
@@ -1385,40 +1436,22 @@ function FavoritesPage({ favorites, onRemove, onOpen, onAddToTrip, onBack }) {
             <button className="button button-dark" onClick={onBack}>Explore destinations <ArrowIcon /></button>
           </div>
         )}
+        {savedItemRecords.length > 0 && <section className="saved-item-list"><div className="favorites-heading"><div><p className="eyebrow">Saved guides</p><h2>More places and <em>ways to go.</em></h2></div><span>{savedItemRecords.length} saved item{savedItemRecords.length === 1 ? '' : 's'}</span></div><div className="phase2-grid">{savedItemRecords.map((item) => <article className="phase2-card" key={item.id}><div className="phase2-card-body"><span className="phase2-label">{item.itemType}</span><h3>{item.itemName}</h3><div className="phase2-actions"><button className="remove-favorite" onClick={() => onRemoveItem(item.itemType, item.itemId)}>Remove</button></div></div></article>)}</div></section>}
       </section>
     </main>
   );
 }
 
-function InformationHub({ onBack, onOpenDestination, guideData = [], festivalData = [], foodData = [] }) {
+function InformationHub({ onBack, onOpenDestination, guideData = [], festivalData = [], foodData = [], hotels = [], restaurants = [], transportation = [], trekkingRoutes = [], savedItems = [], onFavoriteItem = () => {} }) {
   const [activeTab, setActiveTab] = useState('guide');
   const [festivalRegion, setFestivalRegion] = useState('All regions');
   const [festivalTheme, setFestivalTheme] = useState('All themes');
   const [weatherPlace, setWeatherPlace] = useState('Pokhara');
-  const [weather, setWeather] = useState(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
-
-  const loadWeather = async (place) => {
-    setWeatherPlace(place);
-    const apiUrl = import.meta.env.VITE_WEATHER_API_URL;
-    if (!apiUrl) {
-      setWeather(null);
-      return;
-    }
-    setWeatherLoading(true);
-    try {
-      const response = await fetch(`${apiUrl}?city=${encodeURIComponent(place)}`);
-      if (!response.ok) throw new Error('Weather service unavailable');
-      setWeather(await response.json());
-    } catch {
-      setWeather(null);
-    } finally {
-      setWeatherLoading(false);
-    }
-  };
+  const selectedWeatherDestination = destinationCatalog.find((destination) => destination.name === weatherPlace) || destinationCatalog[0];
+  const [selectedRoute, setSelectedRoute] = useState(null);
 
   const mapDestinations = destinationCatalog.slice(0, 8);
-  const tabs = [['guide', 'Travel guide'], ['culture', 'Nepal culture'], ['food', 'Food guide'], ['weather', 'Weather'], ['map', 'Tourism map']];
+  const tabs = [['guide', 'Travel guide'], ['culture', 'Nepal culture'], ['food', 'Food guide'], ['hotels', 'Hotels'], ['restaurants', 'Restaurants'], ['transport', 'Transportation'], ['routes', 'Trekking routes'], ['calendar', 'Festival calendar'], ['assistant', 'AI assistant'], ['weather', 'Weather'], ['map', 'Tourism map']];
 
   return (
     <main className="information-page">
@@ -1428,8 +1461,14 @@ function InformationHub({ onBack, onOpenDestination, guideData = [], festivalDat
         {activeTab === 'guide' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan with confidence</p><h2>Travel <em>guide.</em></h2></div><span>Always verify time-sensitive details with official sources.</span></div><div className="guide-card-grid">{guideData.map(([title, text, note]) => <article className="guide-info-card" key={title}><span className="info-card-icon">✦</span><h3>{title}</h3><p>{text}</p><small>{note}</small></article>)}</div><div className="verification-note">Information here is general travel guidance, not legal, medical or emergency advice. Visa rules, fares, weather, opening hours and health requirements can change.</div></section>}
         {activeTab === 'culture' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Stories, rituals and living heritage</p><h2>Nepal <em>culture.</em></h2></div><span>Dates shown below are approximate and change each year.</span></div><div className="culture-topic-grid">{cultureTopics.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{text}</p></article>)}</div><section className="terai-heritage-panel"><p className="eyebrow">People, places and living traditions</p><h2>Cultural Heritage <em>of Terai.</em></h2><p>The Terai is culturally diverse, with many communities, languages, foods, festivals, arts and religious practices. Chhath has particular prominence in the Terai/Madhesh, while Dashain, Tihar, Holi, Ram Navami, Maha Shivaratri, Krishna Janmashtami, Buddha Jayanti and other festivals are also celebrated widely across Nepal, with local expressions. Janakpur’s Mithila heritage, Tharu traditions, Muslim communities and many other local cultures make the plains a rich place to travel slowly and respectfully.</p></section><h3 className="subsection-title">Mithila Culture</h3><div className="culture-topic-grid"><article><span>01</span><h3>Janakpur as a cultural destination</h3><p>Explore Janaki Temple, Ram-Janaki traditions, sacred ponds, neighborhood celebrations and local cultural experiences.</p></article><article><span>02</span><h3>Art, architecture and crafts</h3><p>Mithila painting, decorated homes, textiles, pottery and other local crafts connect artistic practice with everyday life.</p></article><article><span>03</span><h3>Music, dance and cuisine</h3><p>Regional music and dance, festive clothing, Mithila foods, sweets and hospitality offer a grounded way to experience local culture.</p></article></div><h3 className="subsection-title">Explore Festivals</h3><div className="advanced-filters festival-filters"><label>Region<select value={festivalRegion} onChange={(event) => setFestivalRegion(event.target.value)}><option>All regions</option><option>Terai / Madhesh</option><option>Janakpur / Mithila</option><option>Kathmandu Valley</option><option>Across Nepal</option><option>Himalayan communities</option></select></label><label>Cultural theme<select value={festivalTheme} onChange={(event) => setFestivalTheme(event.target.value)}><option>All themes</option><option>Family and community</option><option>Religious observance</option><option>Arts and heritage</option><option>Seasonal celebration</option></select></label></div><div className="food-grid cultural-festival-grid">{festivalCards.filter(([name, description, region, ritual]) => (festivalRegion === 'All regions' || region.includes(festivalRegion) || (festivalRegion === 'Across Nepal' && region.includes('widely')) || (festivalRegion === 'Terai / Madhesh' && region.includes('Terai'))) && (festivalTheme === 'All themes' || (festivalTheme === 'Family and community' && ['Dashain', 'Tihar / Diwali', 'Holi'].includes(name)) || (festivalTheme === 'Religious observance' && !['Holi'].includes(name)) || (festivalTheme === 'Seasonal celebration' && ['Chhath', 'Holi'].includes(name)) || (festivalTheme === 'Arts and heritage' && ['Tihar / Diwali'].includes(name)))).map(([name, description, region, ritual, image]) => <article className="food-card" key={name}><img src={image} alt={`${name} festival`} /><div><span>{region}</span><h3>{name}</h3><p>{description}</p><small>{ritual}</small></div></article>)}</div><h3 className="subsection-title">Festival calendar</h3><div className="festival-guide-list">{festivals.map(([name, description, season]) => <article key={name}><div><h3>{name}</h3><strong>{season}</strong></div><p>{description}</p></article>)}</div></section>}
         {activeTab === 'food' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Taste the journey</p><h2>Nepal <em>food guide.</em></h2></div><span>Ask about ingredients when dietary needs matter.</span></div><div className="food-grid">{foodData.map(([name, description, region, diet, culture, image]) => <article className="food-card" key={name}><img src={image || fallbackDestinationImage} alt={name} /><div><span>{region}</span><h3>{name}</h3><p>{description}</p><small>{diet}</small><em>{culture}</em></div></article>)}</div></section>}
-        {activeTab === 'weather' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan for the conditions</p><h2>Nepal <em>weather.</em></h2></div><span>Live data requires an optional weather API configuration.</span></div><div className="weather-tool"><div className="weather-selector"><label>Select a destination<select value={weatherPlace} onChange={(event) => loadWeather(event.target.value)}>{destinationCatalog.slice(0, 8).map((destination) => <option key={destination.name}>{destination.name}</option>)}</select></label><p>Best travel season: <strong>{destinationCatalog.find((destination) => destination.name === weatherPlace)?.season || 'Autumn / Spring'}</strong></p></div><div className="weather-result">{weatherLoading ? <p>Loading current weather…</p> : weather ? <><span>Current weather</span><strong>{weather.temperature}°</strong><p>{weather.condition}</p><small>Forecast data supplied by the configured provider.</small></> : <><span>Current weather unavailable</span><strong>—</strong><p>Configure <code>VITE_WEATHER_API_URL</code> to enable live weather for this destination.</p><small>Use official weather information before departure.</small></>}</div></div><div className="season-grid"><div><strong>Spring</strong><span>Clear mountain views and rhododendron blooms.</span></div><div><strong>Summer / monsoon</strong><span>Green landscapes; rain can affect roads and flights.</span></div><div><strong>Autumn</strong><span>Popular trekking season with generally clear skies.</span></div><div><strong>Winter</strong><span>Cool cities and cold high-altitude conditions.</span></div></div></section>}
-        {activeTab === 'map' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Find your way</p><h2>Nepal <em>on the map.</em></h2></div><span>Map markers are an overview; confirm routes locally.</span></div><div className="tourism-map"><div className="map-landscape"><span className="map-label">NEPAL</span>{mapDestinations.map((destination, index) => <button key={destination.id} className={`map-marker marker-${index + 1}`} onClick={() => onOpenDestination(destination)} title={destination.name}>●<span>{destination.name}</span></button>)}</div><div className="map-destination-list">{mapDestinations.map((destination) => <button key={destination.id} onClick={() => onOpenDestination(destination)}><DestinationImage destination={destination} alt="" /><span><strong>{destination.name}</strong><small>{destination.description}</small></span><ArrowIcon /></button>)}</div></div><div className="verification-note">For routing, boundaries and live transport conditions, use an official map provider and local advisories. No map API key is required for this lightweight overview.</div></section>}
+        {activeTab === 'hotels' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Stay near the places you visit</p><h2>Hotels <em>and stays.</em></h2></div><span>Verified commercial data is not connected yet.</span></div>{hotels.length ? <div className="phase2-grid">{hotels.map((hotel) => <HotelCard key={hotel.id || hotel.name} hotel={hotel} favorite={savedItems.includes(`hotel:${hotel.id}`)} onFavorite={() => onFavoriteItem('hotel', hotel)} />)}</div> : <div className="phase2-empty">No hotel records are available yet. Hotel ratings, prices and availability are intentionally not shown without a verified source.</div>}</section>}
+        {activeTab === 'restaurants' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Eat locally</p><h2>Restaurants <em>and food.</em></h2></div><span>The existing Food Guide remains unchanged.</span></div>{restaurants.length ? <div className="phase2-grid">{restaurants.map((restaurant) => <RestaurantCard key={restaurant.id || restaurant.name} restaurant={restaurant} favorite={savedItems.includes(`restaurant:${restaurant.id}`)} onFavorite={() => onFavoriteItem('restaurant', restaurant)} />)}</div> : <div className="phase2-empty">No restaurant records are available yet. Ratings, prices and opening hours are intentionally not shown without verified data.</div>}</section>}
+        {activeTab === 'transport' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Move between places</p><h2>Getting <em>around.</em></h2></div><span>Schedules and fares must be confirmed before departure.</span></div>{transportation.length ? <div className="phase2-grid">{transportation.map((transport) => <TransportationCard key={transport.id || transport.name} transport={transport} />)}</div> : <div className="phase2-empty">No transportation records are available yet. Live schedules and prices are not provided by this guide.</div>}</section>}
+        {activeTab === 'routes' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Detailed trail reference</p><h2>Trekking <em>routes.</em></h2></div><span>The existing Adventure &amp; Experiences section is unchanged.</span></div>{trekkingRoutes.length ? <><div className="phase2-grid route-grid">{trekkingRoutes.map((route) => <TrekkingRouteCard key={route.id || route.name} route={route} onSelect={setSelectedRoute} favorite={savedItems.includes(`trekking-route:${route.id}`)} onFavorite={() => onFavoriteItem('trekking-route', route)} />)}</div><TrekkingRouteDetails route={selectedRoute} onClose={() => setSelectedRoute(null)} /></> : <div className="phase2-empty">No detailed route records are available yet. Unsupported elevations, durations and difficulty values are left blank.</div>}</section>}
+        {activeTab === 'calendar' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan around living traditions</p><h2>Festival <em>calendar.</em></h2></div><span>Dates vary by year and lunar calendar.</span></div><div className="festival-calendar-list">{festivalData.map(([name, description, region, ritual, image, dateInformation, dateKnown]) => <article key={name}><div><span className="phase2-label">{dateKnown ? 'Date available' : 'Date varies'}</span><h3>{name}</h3><p className="phase2-meta">{region}</p></div><p>{description}</p><strong>{dateInformation || 'Verify the annual local calendar.'}</strong><span className="festival-status">{dateKnown ? 'Check current year status' : 'Annual date not fixed in this catalog'}</span></article>)}</div></section>}
+        {activeTab === 'assistant' && <section className="info-view"><AITravelAssistant /></section>}
+        {activeTab === 'weather' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan for the conditions</p><h2>Nepal <em>weather.</em></h2></div><span>Live data requires an optional weather API key.</span></div><div className="weather-tool"><div className="weather-selector"><label>Select a destination<select value={weatherPlace} onChange={(event) => setWeatherPlace(event.target.value)}>{destinationCatalog.slice(0, 8).map((destination) => <option key={destination.name}>{destination.name}</option>)}</select></label><p>Best travel season: <strong>{selectedWeatherDestination?.season || 'Autumn / Spring'}</strong></p></div><WeatherWidget destination={selectedWeatherDestination} /></div><div className="season-grid"><div><strong>Spring</strong><span>Clear mountain views and rhododendron blooms.</span></div><div><strong>Summer / monsoon</strong><span>Green landscapes; rain can affect roads and flights.</span></div><div><strong>Autumn</strong><span>Popular trekking season with generally clear skies.</span></div><div><strong>Winter</strong><span>Cool cities and cold high-altitude conditions.</span></div></div></section>}
+        {activeTab === 'map' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Find your way</p><h2>Nepal <em>on the map.</em></h2></div><span>Map markers are an overview; confirm routes locally.</span></div><InteractiveMap destinations={mapDestinations} selectedDestination={mapDestinations.find((item) => item.name === weatherPlace) || mapDestinations[0]} onSelectDestination={onOpenDestination} /><div className="verification-note">For routing, boundaries and live transport conditions, use an official map provider and local advisories. This version is powered by OpenStreetMap tiles and optional destination coordinates.</div></section>}
       </section>
     </main>
   );
@@ -1437,7 +1476,7 @@ function InformationHub({ onBack, onOpenDestination, guideData = [], festivalDat
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [language, setLanguage] = useState('EN');
+  const [language, setLanguage] = useState(() => localStorage.getItem('nepal-tourism-lang') || 'EN');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
@@ -1449,9 +1488,12 @@ function App() {
     }
   });
   const [experiences, setExperiences] = useState([]);
+  const [phase2Catalog, setPhase2Catalog] = useState({ hotels: [], restaurants: [], transportation: [], trekkingRoutes: [] });
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
   const [favorites, setFavorites] = useState([]);
+  const [savedItems, setSavedItems] = useState([]);
+  const [savedItemRecords, setSavedItemRecords] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState(null);
   const isAuthenticated = Boolean(authenticatedUser && localStorage.getItem('nepal-tourism-token'));
   const [filters, setFilters] = useState({
@@ -1474,6 +1516,9 @@ function App() {
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [informationOpen, setInformationOpen] = useState(false);
   const [regionOpen, setRegionOpen] = useState(null);
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { t, i18n } = useTranslation();
   const pageSize = 6;
 
   useEffect(() => {
@@ -1501,9 +1546,18 @@ function App() {
     };
   }, []);
 
+  // Sync language selector → i18next + localStorage
   useEffect(() => {
-    if (!isAuthenticated) { setFavorites([]); return undefined; }
+    const code = language === 'NE' ? 'ne' : 'en';
+    i18n.changeLanguage(code);
+    localStorage.setItem('nepal-tourism-lang', language);
+    localStorage.setItem('nepal-tourism-lang-code', code);
+  }, [language, i18n]);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setFavorites([]); setSavedItems([]); setSavedItemRecords([]); return undefined; }
     fetchApi('/api/favorites').then((items) => setFavorites(items.map((item) => item.destinationId))).catch(() => setFavorites([]));
+    fetchApi('/api/favorites/items').then((items) => { setSavedItemRecords(items); setSavedItems(items.map((item) => `${item.itemType}:${item.itemId}`)); }).catch(() => { setSavedItems([]); setSavedItemRecords([]); });
     return undefined;
   }, [isAuthenticated]);
 
@@ -1512,15 +1566,20 @@ function App() {
     const loadCatalog = async () => {
       try {
         setCatalogLoading(true);
-        const [destinationData, experienceData, guideData, festivalData, foodData] = await Promise.all([
+        const [destinationData, experienceData, guideData, festivalData, foodData, hotelData, restaurantData, transportationData, trekkingRouteData] = await Promise.all([
           fetchApi('/api/destinations', { signal: controller.signal }),
           fetchApi('/api/experiences', { signal: controller.signal }),
           fetchApi('/api/travel-guide', { signal: controller.signal }),
           fetchApi('/api/festivals', { signal: controller.signal }),
           fetchApi('/api/foods', { signal: controller.signal }),
+          fetchApi('/api/hotels', { signal: controller.signal }),
+          fetchApi('/api/restaurants', { signal: controller.signal }),
+          fetchApi('/api/transportation', { signal: controller.signal }),
+          fetchApi('/api/trekking-routes', { signal: controller.signal }),
         ]);
         applyBackendDestinations(destinationData);
         applyBackendInformation({ guide: guideData, festivals: festivalData, food: foodData });
+        setPhase2Catalog({ hotels: hotelData, restaurants: restaurantData, transportation: transportationData, trekkingRoutes: trekkingRouteData });
         setExperiences(experienceData.map((experience) => ({
           ...experience,
           image: experienceImageByName[experience.name] || experience.image || fallbackExperiences[0].image,
@@ -1578,6 +1637,25 @@ function App() {
       setCatalogError(error.message || 'Favorite could not be updated.');
     } finally {
       setFavoriteLoading(null);
+    }
+  };
+
+  const toggleSavedItem = async (itemType, item) => {
+    if (!isAuthenticated) { setAuthPanelOpen(true); return; }
+    const itemId = String(item.id);
+    const key = `${itemType}:${itemId}`;
+    try {
+      if (savedItems.includes(key)) {
+        await fetchApi(`/api/favorites/items/${itemType}/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+        setSavedItems((current) => current.filter((value) => value !== key));
+        setSavedItemRecords((current) => current.filter((value) => `${value.itemType}:${value.itemId}` !== key));
+      } else {
+        const savedRecord = await fetchApi('/api/favorites/items', { method: 'POST', body: JSON.stringify({ itemType, itemId, itemName: item.name, itemImage: item.imageUrl || item.image || '' }) });
+        setSavedItems((current) => [...current, key]);
+        setSavedItemRecords((current) => [...current, savedRecord]);
+      }
+    } catch (error) {
+      setCatalogError(error.message || 'Favorite could not be updated.');
     }
   };
 
@@ -1668,6 +1746,8 @@ function App() {
     setPlannerOpen(false);
     setExperiencesOpen(false);
     setExploreOpen(false);
+    setEmergencyOpen(false);
+    setNotificationsOpen(false);
     setSelectedDestination(null);
     window.history.pushState({}, '', '#favorites');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1681,8 +1761,40 @@ function App() {
     setPlannerOpen(false);
     setExperiencesOpen(false);
     setExploreOpen(false);
+    setEmergencyOpen(false);
+    setNotificationsOpen(false);
     setSelectedDestination(null);
     window.history.pushState({}, '', '#guide');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setMenuOpen(false);
+  };
+
+  const openEmergency = () => {
+    setRegionOpen(null);
+    setEmergencyOpen(true);
+    setNotificationsOpen(false);
+    setInformationOpen(false);
+    setFavoritesOpen(false);
+    setPlannerOpen(false);
+    setExperiencesOpen(false);
+    setExploreOpen(false);
+    setSelectedDestination(null);
+    window.history.pushState({}, '', '#emergency');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setMenuOpen(false);
+  };
+
+  const openNotifications = () => {
+    setRegionOpen(null);
+    setNotificationsOpen(true);
+    setEmergencyOpen(false);
+    setInformationOpen(false);
+    setFavoritesOpen(false);
+    setPlannerOpen(false);
+    setExperiencesOpen(false);
+    setExploreOpen(false);
+    setSelectedDestination(null);
+    window.history.pushState({}, '', '#notifications');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setMenuOpen(false);
   };
@@ -1702,22 +1814,24 @@ function App() {
     <div className="app-shell">
       <header className="site-header">
         <a className="brand" href="#top" onClick={() => scrollTo('top')} aria-label="Nepal Tourism Guide home">
-          <span className="brand-mark">✦</span>
+          <img className="brand-mark" src={logoUrl} alt="" />
           <span><strong>Nepal</strong><small>Tourism Guide</small></span>
         </a>
         <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation menu" aria-expanded={menuOpen}><span /><span /><span /></button>
         <nav className={menuOpen ? 'main-nav open' : 'main-nav'} aria-label="Main navigation">
-          <a className="active" href="#top" onClick={() => scrollTo('top')}>Home</a>
-          <a href="#destinations" onClick={() => scrollTo('destinations')}>Destinations</a>
-          <a href="#explore" onClick={openExplore}>Explore Nepal</a>
-          <a href="#experiences" onClick={openExperiences}>Experiences</a>
-          <a href="#planner" onClick={openPlanner}>Trip planner</a>
-          <a href="#favorites" onClick={openFavorites}>My favorites{favorites.length > 0 && <span className="nav-count">{favorites.length}</span>}</a>
-          <a href="#categories" onClick={() => scrollTo('categories')}>Categories</a>
-          <a href="#guide" onClick={openInformation}>Travel guide</a>
+          <a className="active" href="#top" onClick={() => scrollTo('top')}>{t('nav.home')}</a>
+          <a href="#destinations" onClick={() => scrollTo('destinations')}>{t('nav.destinations')}</a>
+          <a href="#explore" onClick={openExplore}>{t('nav.explore')}</a>
+          <a href="#experiences" onClick={openExperiences}>{t('nav.experiences')}</a>
+          <a href="#planner" onClick={openPlanner}>{t('nav.planner')}</a>
+          <a href="#favorites" onClick={openFavorites}>{t('nav.favorites')}{favorites.length > 0 && <span className="nav-count">{favorites.length}</span>}</a>
+          <a href="#categories" onClick={() => scrollTo('categories')}>{t('nav.categories')}</a>
+          <a href="#guide" onClick={openInformation}>{t('nav.guide')}</a>
+          <a href="#emergency" onClick={openEmergency} className="nav-emergency">{t('nav.emergency')}</a>
+          <a href="#notifications" onClick={openNotifications}>{t('nav.notifications')}</a>
         </nav>
         <div className="header-actions">
-          <label className="language-select"><span className="globe">◎</span><select value={language} onChange={(event) => setLanguage(event.target.value)} aria-label="Choose language"><option value="EN">EN</option><option value="NE">नेपाली</option><option value="DE">DE</option></select></label>
+          <label className="language-select"><span className="globe">◎</span><select value={language} onChange={(event) => setLanguage(event.target.value)} aria-label="Choose language"><option value="EN">EN</option><option value="NE">नेपाली</option></select></label>
           {authenticatedUser ? <button className="login-link" onClick={logout} title="Log out">{authenticatedUser.name || 'Account'} · Log out</button> : <button className="login-link" onClick={() => setAuthPanelOpen(true)}>Log in <ArrowIcon /></button>}
         </div>
       </header>
@@ -1727,7 +1841,7 @@ function App() {
       {catalogError && <div className="page-container empty-state" role="alert">{catalogError} Check that the Spring Boot backend is running on port 8080.</div>}
 
       <main id="top">
-        {selectedDestination ? <DestinationDetails destination={selectedDestination} favorite={favorites.includes(selectedDestination.id)} onFavorite={toggleFavorite} onBack={closeDestination} onAddToTrip={openPlannerWithPlace} /> : regionOpen ? <RegionPage regionKey={regionOpen} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={openDestination} onBack={() => { setRegionOpen(null); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : exploreOpen ? <ExploreNepal selectedRegion={selectedRegion} onSelectRegion={setSelectedRegion} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={(destination) => { setExploreOpen(false); openDestination(destination); }} onBack={() => { setExploreOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : experiencesOpen ? <ExperiencesPage experiences={experiences} onBack={() => { setExperiencesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : plannerOpen ? <TripPlanner initialPlaces={plannerPlaces} onBack={() => { setPlannerOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : favoritesOpen ? <FavoritesPage favorites={favorites} onRemove={toggleFavorite} onOpen={(destination) => { setFavoritesOpen(false); openDestination(destination); }} onAddToTrip={openPlannerWithPlace} onBack={() => { setFavoritesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : informationOpen ? <InformationHub guideData={travelGuideSections} festivalData={festivalCards} foodData={foods} onBack={() => { setInformationOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onOpenDestination={(destination) => { setInformationOpen(false); openDestination(destination); }} /> : <>
+        {selectedDestination ? <DestinationDetails destination={selectedDestination} favorite={favorites.includes(selectedDestination.id)} onFavorite={toggleFavorite} onBack={closeDestination} onAddToTrip={openPlannerWithPlace} /> : regionOpen ? <RegionPage regionKey={regionOpen} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={openDestination} onBack={() => { setRegionOpen(null); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : exploreOpen ? <ExploreNepal selectedRegion={selectedRegion} onSelectRegion={setSelectedRegion} favorites={favorites} onFavorite={toggleFavorite} onExploreDestination={(destination) => { setExploreOpen(false); openDestination(destination); }} onBack={() => { setExploreOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : experiencesOpen ? <ExperiencesPage experiences={experiences} savedItems={savedItems} onFavoriteItem={toggleSavedItem} onBack={() => { setExperiencesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : plannerOpen ? <TripPlanner initialPlaces={plannerPlaces} foodData={foods} festivalData={festivalCards} transportationData={phase2Catalog.transportation} onBack={() => { setPlannerOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : favoritesOpen ? <FavoritesPage favorites={favorites} savedItemRecords={savedItemRecords} onRemove={toggleFavorite} onRemoveItem={(itemType, itemId) => toggleSavedItem(itemType, { id: itemId, name: itemId })} onOpen={(destination) => { setFavoritesOpen(false); openDestination(destination); }} onAddToTrip={openPlannerWithPlace} onBack={() => { setFavoritesOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : informationOpen ? <InformationHub guideData={travelGuideSections} festivalData={festivalCards} foodData={foods} hotels={phase2Catalog.hotels} restaurants={phase2Catalog.restaurants} transportation={phase2Catalog.transportation} trekkingRoutes={phase2Catalog.trekkingRoutes} savedItems={savedItems} onFavoriteItem={toggleSavedItem} onBack={() => { setInformationOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onOpenDestination={(destination) => { setInformationOpen(false); openDestination(destination); }} /> : emergencyOpen ? <EmergencyContacts onBack={() => { setEmergencyOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : notificationsOpen ? <TravelNotifications onBack={() => { setNotificationsOpen(false); window.history.pushState({}, '', '#top'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /> : <>
         <section className="dashboard-hero">
           <div className="hero-image" /><div className="hero-overlay" />
           <div className="page-container hero-dashboard-content">
@@ -1804,7 +1918,7 @@ function App() {
         <section className="cta-section"><div className="page-container cta-inner"><p className="eyebrow light">Your story is waiting</p><h2>Ready to find your<br /><em>Nepal?</em></h2><p>Save your favorite places and start building a journey that feels like yours.</p><button className="button button-primary" onClick={() => scrollTo('destinations')}>Start exploring <ArrowIcon /></button></div></section>
         </>}
       </main>
-      <footer className="site-footer"><div className="page-container footer-inner"><a className="brand footer-brand" href="#top"><span className="brand-mark">✦</span><span><strong>Nepal</strong><small>Tourism Guide</small></span></a><p>Go gently. Go further.</p><span className="footer-copy">© 2026 Nepal Tourism Guide</span></div></footer>
+      <footer className="site-footer"><div className="page-container footer-inner"><a className="brand footer-brand" href="#top"><img className="brand-mark" src={logoUrl} alt="" /><span><strong>Nepal</strong><small>Tourism Guide</small></span></a><p>Go gently. Go further.</p><span className="footer-copy">© 2026 Nepal Tourism Guide</span></div></footer>
     </div>
   );
 }

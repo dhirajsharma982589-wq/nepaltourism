@@ -38,8 +38,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/public/**", "/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/destinations/**", "/api/regions/**", "/api/categories/**", "/api/experiences/**", "/api/festivals/**", "/api/foods/**", "/api/travel-guide", "/api/emergency-contacts").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/public/**", "/api/ai/**", "/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/destinations/**", "/api/regions/**", "/api/categories/**", "/api/experiences/**", "/api/festivals/**", "/api/foods/**", "/api/travel-guide", "/api/emergency-contacts", "/api/notifications/**", "/api/hotels", "/api/restaurants", "/api/transportation", "/api/trekking-routes").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/notifications/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/notifications/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/notifications/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
