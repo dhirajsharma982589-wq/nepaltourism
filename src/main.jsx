@@ -1,21 +1,34 @@
-import React, { StrictMode, useEffect, useMemo, useState } from 'react';
+import React, { lazy, StrictMode, Suspense, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { buildApiUrl, fetchApi } from './apiConfig';
 import { getDestinationLocation } from './data/destinationLocations';
 import { WeatherWidget } from './components/WeatherWidget';
-import { InteractiveMap } from './components/InteractiveMap';
 import { HotelCard } from './components/HotelCard';
 import { RestaurantCard } from './components/RestaurantCard';
 import { TransportationCard } from './components/TransportationCard';
 import { TrekkingRouteCard } from './components/TrekkingRouteCard';
 import { TrekkingRouteDetails } from './components/TrekkingRouteDetails';
-import { AITravelAssistant } from './components/AITravelAssistant';
 import logoUrl from './assets/nepal-tourism-logo.svg';
+import trekkingImage from './assets/experiences/trekking.jpg';
+import mountaineeringImage from './assets/experiences/mountaineering.jpg';
+import paraglidingImage from './assets/experiences/paragliding.jpg';
+import raftingImage from './assets/experiences/rafting.jpg';
+import jungleSafariImage from './assets/experiences/jungle-safari.jpg';
+import bungeeJumpingImage from './assets/experiences/bungee-jumping.jpg';
+import mountainFlightImage from './assets/experiences/mountain-flight.jpg';
+import campingImage from './assets/experiences/camping.jpg';
+import rockClimbingImage from './assets/experiences/rock-climbing.jpg';
+import cyclingImage from './assets/experiences/cycling.jpg';
+import culturalToursImage from './assets/experiences/cultural-tours.jpg';
+import spiritualExperiencesImage from './assets/experiences/spiritual-experiences.jpg';
 import { useTranslation } from 'react-i18next';
 import { EmergencyContacts } from './components/EmergencyContacts';
 import { TravelNotifications } from './components/TravelNotifications';
 import './i18n';
+
+const InteractiveMap = lazy(() => import('./components/InteractiveMap').then((module) => ({ default: module.InteractiveMap })));
+const AITravelAssistant = lazy(() => import('./components/AITravelAssistant').then((module) => ({ default: module.AITravelAssistant })));
 
 const destinations = [
   {
@@ -485,19 +498,19 @@ const regions = [
 ];
 
 const experienceImageByName = {
-  Trekking: 'https://commons.wikimedia.org/wiki/Special:FilePath/Nepal%20Yak%20-%20Himalaya%20trekking.jpg',
-  'Mountaineering': 'https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Everest%20-%20Kukuczka%20Czok.jpg',
-  'Paragliding': 'https://commons.wikimedia.org/wiki/Special:FilePath/%27Tandem%20Paragliding%27%20over%20Pokhara.%28Tuesday%2022-11-2011%29.JPG',
-  'Rafting': 'https://commons.wikimedia.org/wiki/Special:FilePath/Demonstration%20Before%20Raft-Rafting%20in%20Trishuli%20River%2C%20Nepal-3060.jpg',
-  'Bungee Jumping': 'https://commons.wikimedia.org/wiki/Special:FilePath/Amritpaudelphoto3.png',
-  'Jungle Safari': 'https://commons.wikimedia.org/wiki/Special:FilePath/Indian%20rhinoceros%20%28Rhinoceros%20unicornis%29%201.jpg',
-  'Mountain Flight': 'https://commons.wikimedia.org/wiki/Special:FilePath/8%2C848m%20Everest%208%2C516m%20Lhotse%20Himalaya%20Mountain%20Flights%20Nepal%20-%20panoramio.jpg',
-  'Camping': 'https://upload.wikimedia.org/wikipedia/commons/c/c1/The_Heavenly_Rara_Lake_-_edited_2.jpg',
-  'Rock Climbing': 'https://commons.wikimedia.org/wiki/Special:FilePath/Rock%20Climbing%20In%20Nepal%20%28128592639%29.jpeg',
+  Trekking: trekkingImage,
+  'Mountaineering': mountaineeringImage,
+  'Paragliding': paraglidingImage,
+  'Rafting': raftingImage,
+  'Bungee Jumping': bungeeJumpingImage,
+  'Jungle Safari': jungleSafariImage,
+  'Mountain Flight': mountainFlightImage,
+  'Camping': campingImage,
+  'Rock Climbing': rockClimbingImage,
   'Zipline': 'https://images.unsplash.com/photo-1529516548873-9ce57c8f155e?auto=format&fit=crop&w=1200&q=80',
-  'Cycling': 'https://commons.wikimedia.org/wiki/Special:FilePath/Welcoming%20Participants%20of%20Nepal%20Cycle%20Festival%20in%20Bhaktpur.jpg',
-  'Cultural Tours': 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Bhaktapur_Durbar_Square_2018_13.jpg',
-  'Spiritual Experiences': 'https://commons.wikimedia.org/wiki/Special:FilePath/Swayambhunath%20Stupa%20-Kathmandu%20Nepal-0336.jpg',
+  'Cycling': cyclingImage,
+  'Cultural Tours': culturalToursImage,
+  'Spiritual Experiences': spiritualExperiencesImage,
 };
 
 const fallbackExperiences = [
@@ -1466,9 +1479,9 @@ function InformationHub({ onBack, onOpenDestination, guideData = [], festivalDat
         {activeTab === 'transport' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Move between places</p><h2>Getting <em>around.</em></h2></div><span>Schedules and fares must be confirmed before departure.</span></div>{transportation.length ? <div className="phase2-grid">{transportation.map((transport) => <TransportationCard key={transport.id || transport.name} transport={transport} />)}</div> : <div className="phase2-empty">No transportation records are available yet. Live schedules and prices are not provided by this guide.</div>}</section>}
         {activeTab === 'routes' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Detailed trail reference</p><h2>Trekking <em>routes.</em></h2></div><span>The existing Adventure &amp; Experiences section is unchanged.</span></div>{trekkingRoutes.length ? <><div className="phase2-grid route-grid">{trekkingRoutes.map((route) => <TrekkingRouteCard key={route.id || route.name} route={route} onSelect={setSelectedRoute} favorite={savedItems.includes(`trekking-route:${route.id}`)} onFavorite={() => onFavoriteItem('trekking-route', route)} />)}</div><TrekkingRouteDetails route={selectedRoute} onClose={() => setSelectedRoute(null)} /></> : <div className="phase2-empty">No detailed route records are available yet. Unsupported elevations, durations and difficulty values are left blank.</div>}</section>}
         {activeTab === 'calendar' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan around living traditions</p><h2>Festival <em>calendar.</em></h2></div><span>Dates vary by year and lunar calendar.</span></div><div className="festival-calendar-list">{festivalData.map(([name, description, region, ritual, image, dateInformation, dateKnown]) => <article key={name}><div><span className="phase2-label">{dateKnown ? 'Date available' : 'Date varies'}</span><h3>{name}</h3><p className="phase2-meta">{region}</p></div><p>{description}</p><strong>{dateInformation || 'Verify the annual local calendar.'}</strong><span className="festival-status">{dateKnown ? 'Check current year status' : 'Annual date not fixed in this catalog'}</span></article>)}</div></section>}
-        {activeTab === 'assistant' && <section className="info-view"><AITravelAssistant /></section>}
+        {activeTab === 'assistant' && <section className="info-view"><Suspense fallback={<div className="empty-state">Loading assistant...</div>}><AITravelAssistant /></Suspense></section>}
         {activeTab === 'weather' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Plan for the conditions</p><h2>Nepal <em>weather.</em></h2></div><span>Live data requires an optional weather API key.</span></div><div className="weather-tool"><div className="weather-selector"><label>Select a destination<select value={weatherPlace} onChange={(event) => setWeatherPlace(event.target.value)}>{destinationCatalog.slice(0, 8).map((destination) => <option key={destination.name}>{destination.name}</option>)}</select></label><p>Best travel season: <strong>{selectedWeatherDestination?.season || 'Autumn / Spring'}</strong></p></div><WeatherWidget destination={selectedWeatherDestination} /></div><div className="season-grid"><div><strong>Spring</strong><span>Clear mountain views and rhododendron blooms.</span></div><div><strong>Summer / monsoon</strong><span>Green landscapes; rain can affect roads and flights.</span></div><div><strong>Autumn</strong><span>Popular trekking season with generally clear skies.</span></div><div><strong>Winter</strong><span>Cool cities and cold high-altitude conditions.</span></div></div></section>}
-        {activeTab === 'map' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Find your way</p><h2>Nepal <em>on the map.</em></h2></div><span>Map markers are an overview; confirm routes locally.</span></div><InteractiveMap destinations={mapDestinations} selectedDestination={mapDestinations.find((item) => item.name === weatherPlace) || mapDestinations[0]} onSelectDestination={onOpenDestination} /><div className="verification-note">For routing, boundaries and live transport conditions, use an official map provider and local advisories. This version is powered by OpenStreetMap tiles and optional destination coordinates.</div></section>}
+        {activeTab === 'map' && <section className="info-view"><div className="info-view-heading"><div><p className="eyebrow">Find your way</p><h2>Nepal <em>on the map.</em></h2></div><span>Map markers are an overview; confirm routes locally.</span></div><Suspense fallback={<div className="empty-state">Loading map...</div>}><InteractiveMap destinations={mapDestinations} selectedDestination={mapDestinations.find((item) => item.name === weatherPlace) || mapDestinations[0]} onSelectDestination={onOpenDestination} /></Suspense><div className="verification-note">For routing, boundaries and live transport conditions, use an official map provider and local advisories. This version is powered by OpenStreetMap tiles and optional destination coordinates.</div></section>}
       </section>
     </main>
   );
